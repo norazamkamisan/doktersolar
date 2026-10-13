@@ -38,7 +38,7 @@ export function CountBarChart({ data, unit }: { data: { label: string; value: nu
             active && payload?.length ? <TipBox title={String(label)} value={`${payload[0].value} ${unit}`} /> : null
           }
         />
-        <Bar dataKey="value" fill={ACCENT} radius={[4, 4, 0, 0]} maxBarSize={36} />
+        <Bar dataKey="value" fill={ACCENT} radius={[4, 4, 0, 0]} maxBarSize={36} isAnimationActive={false} />
       </BarChart>
     </ResponsiveContainer>
   );
