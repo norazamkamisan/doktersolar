@@ -151,13 +151,19 @@ Get a free API key at https://developer.nlr.gov/signup/. NREL is now the **Natio
    - Framework preset: **Vite**
    - Build command: `npm run build`
    - Output directory: `dist`
-5. **(Optional) Turn on PVWatts now:** open **Environment Variables** on the same screen and add `NREL_API_KEY` = your NREL key.
+5. **(Optional) Turn on PVWatts now:** open **Environment Variables** on the same screen and add `NREL_API_KEY` = your NREL key. Apply it to both **Production** and **Preview** so pull-request previews get PVWatts too (see below).
 6. Click **Deploy**. After a minute you get a URL like `https://doktersolar.vercel.app`.
    - The rewrite in `vercel.json` sends every non-`/api` path to `index.html`, so deep links such as `/projects/demo-1/design` and shared proposal links work.
    - `api/pvwatts.js` deploys automatically as a function at `/api/pvwatts`.
-7. Every push to `main` redeploys. Pushes to other branches get their own preview URLs.
+7. Every push to `main` redeploys. Pushes to other branches and pull requests get their own preview URLs.
 
-**Adding the key later:** go to **Project → Settings → Environment Variables**, add `NREL_API_KEY` (for Production, plus Preview if you want it there too), then **Deployments → ⋯ → Redeploy**. Environment variables only apply to new deployments.
+**Adding the key later:** go to **Project → Settings → Environment Variables** and add `NREL_API_KEY` for **Production and Preview**. Then go to **Deployments → ⋯ → Redeploy**. Environment variables only apply to new deployments.
+
+**PVWatts on preview deployments:** when `NREL_API_KEY` covers the **Preview** environment, every branch and pull-request preview gets a working `/api/pvwatts`, so you can test energy changes before merging. If the key is Production-only, previews still work but fall back to the simple estimate (the PVWatts button shows "not configured").
+
+- **To add Preview to an existing key:** edit the variable and tick **Preview** under Environments. Leave the value blank, which keeps the saved secret.
+- **To apply it without a new push:** use **Redeploy** and choose **Preview** as the environment.
+- **Shared quota:** previews and production use the same key, so they share its rate limit.
 
 The key is only read on the server (`server/pvwatts-core.mjs`, via `process.env.NREL_API_KEY`). It is never bundled into the frontend. Don't prefix it with `VITE_`.
 
