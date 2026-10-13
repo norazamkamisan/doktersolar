@@ -47,7 +47,7 @@ export default function EnergyTab({ project: p }: { project: Project }) {
     <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
       <div className="min-w-0 space-y-4">
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard label="Annual production" value={`${num(energy.annualKwh)} kWh`} hint={energy.source === 'pvwatts' ? 'NREL PVWatts' : 'Simple estimate'} />
+          <StatCard label="Annual production" value={`${num(energy.annualKwh)} kWh`} hint={energy.source === 'pvwatts' ? 'PVWatts (NLR)' : 'Simple estimate'} />
           <StatCard label="Bill offset" value={`${num(energy.offsetPct)}%`} hint={`of ~${num(energy.consumptionKwh)} kWh/yr usage`} />
           <StatCard label="Payback" value={fin.paybackYears ? `${num(fin.paybackYears, 1)} yrs` : '> 25 yrs'} hint={`System cost ${money(fin.systemCost, currency)}`} />
           <StatCard label="25-year savings" value={money(fin.savings25, currency)} hint={`Net ${money(fin.netSavings25, currency)}`} />
@@ -98,7 +98,7 @@ export default function EnergyTab({ project: p }: { project: Project }) {
         <section className="card space-y-3 p-5">
           <div className="flex items-center gap-2">
             <CloudSun className="h-5 w-5 text-brand-500" />
-            <h3 className="font-semibold text-slate-900">NREL PVWatts</h3>
+            <h3 className="font-semibold text-slate-900">PVWatts</h3>
           </div>
           <p className="text-xs text-slate-500">
             Uses weather data for this location via the site's serverless function. Requires <code>NREL_API_KEY</code> to be set in the hosting environment.

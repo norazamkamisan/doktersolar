@@ -123,7 +123,7 @@ vercel dev
 
 This serves the app and `/api/pvwatts` together (usually at http://localhost:3000).
 
-Get a free NREL key at https://developer.nrel.gov/signup/.
+Get a free API key at https://developer.nlr.gov/signup/. NREL is now the **National Laboratory of the Rockies (NLR)**, and its API moved from `developer.nrel.gov` to `developer.nlr.gov`. The environment variable keeps its original name, `NREL_API_KEY`.
 
 ---
 
@@ -163,7 +163,7 @@ vercel --prod
 - **Roof area:** the polygon is projected to local metres (equirectangular around its centroid), then the shoelace formula gives the area. Sloped area = plan area ÷ cos(tilt).
 - **Panel fill:** the roof is rotated so rows run perpendicular to the azimuth. A grid of panel footprints is tested: all four corners must sit inside the roof, at least the setback distance from every edge, and no roof vertex may poke into a panel. The plan-view length of a panel shrinks by cos(tilt). Sixteen grid offsets are tried and the one that fits the most panels wins.
 - **Production (simple):** `kWp × peak sun hours × 365 × 0.8`, split across months by day count with a mild seasonal curve that grows with latitude.
-- **Production (PVWatts):** NREL PVWatts v8, fixed roof mount, 14% losses. The function tries the `nsrdb` dataset first and falls back to `intl`.
+- **Production (PVWatts):** PVWatts v8 from NLR (formerly NREL), fixed roof mount, 14% losses. The function tries the `nsrdb` dataset first and falls back to `intl`.
 - **Savings:** year-*n* savings = production × (1 − degradation)^(n−1) × tariff × (1 + escalation)^(n−1). Payback is the interpolated year where cumulative savings exceed the system cost (`kWp × 1000 × price per watt`).
 
 These are indicative estimates for a portfolio demo, not engineering-grade simulations. They don't model shading, inverter clipping, export tariffs or net metering.

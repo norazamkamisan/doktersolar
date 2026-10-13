@@ -1,4 +1,5 @@
-// Shared NREL PVWatts v8 proxy logic, used by both:
+// Shared PVWatts v8 proxy logic (NLR, the National Laboratory of the Rockies,
+// formerly NREL; API at developer.nlr.gov), used by both:
 //   - Vercel:  api/pvwatts.js
 //   - Netlify: netlify/functions/pvwatts.mjs
 // The API key is read from process.env.NREL_API_KEY on the server and never sent to the browser.
@@ -47,7 +48,7 @@ export async function handlePvWatts(req) {
   for (const dataset of ['nsrdb', 'intl']) {
     params.set('dataset', dataset);
     try {
-      const res = await fetch(`https://developer.nrel.gov/api/pvwatts/v8.json?${params}`);
+      const res = await fetch(`https://developer.nlr.gov/api/pvwatts/v8.json?${params}`);
       const data = await res.json();
       if (res.ok && data?.outputs?.ac_monthly) {
         return json(200, {

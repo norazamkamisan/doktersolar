@@ -121,7 +121,7 @@ export default function ProposalDocument({ project: p, settings: s }: { project:
               {[
                 ['Solar panels', `${p.panelCount} × ${p.design.panelWattage} W (${p.design.panelWidth} × ${p.design.panelHeight} m, ${p.design.orientation})`],
                 ['Tilt / azimuth', `${p.design.tilt}° / ${p.design.azimuth}°`],
-                ['Production model', energy.source === 'pvwatts' ? 'NREL PVWatts v8 (location weather data)' : `${p.energy.peakSunHours} peak sun hours × 365 × 0.8 performance ratio`],
+                ['Production model', energy.source === 'pvwatts' ? 'PVWatts v8 by NLR (location weather data)' : `${p.energy.peakSunHours} peak sun hours × 365 × 0.8 performance ratio`],
                 ['Electricity tariff', `${money(p.energy.tariff, s.currency, 3)} per kWh, rising ${p.energy.escalation}% per year`],
                 ['Panel degradation', `${p.energy.degradation}% per year`],
                 ['Current monthly bill', money(p.monthlyBill, s.currency)],
