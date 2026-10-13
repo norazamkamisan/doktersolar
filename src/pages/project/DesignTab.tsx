@@ -1,5 +1,5 @@
 import { FormEvent, useMemo, useState } from 'react';
-import { Check, Loader2, MousePointerClick, Move, PenLine, RotateCcw, Search, Trash2, Undo2, X } from 'lucide-react';
+import { Check, Loader2, MousePointerClick, Move, PenLine, RotateCcw, Search, Trash2, Undo2, X, type LucideIcon } from 'lucide-react';
 import type { LatLng, Project } from '../../types';
 import { updateDesign, updateProject } from '../../lib/store';
 import { geocode } from '../../lib/api';
@@ -22,6 +22,51 @@ function cleanRing(pts: LatLng[]): LatLng[] {
   const last = out[out.length - 1];
   if (out.length > 3 && Math.abs(first[0] - last[0]) < 2e-7 && Math.abs(first[1] - last[1]) < 2e-7) out.pop();
   return out;
+}
+
+/**
+ * Map toolbar button.
+ * - `primary`: orange, label always visible
+ * - `compact`: label hidden on phones (icon-only), visible from `sm` up
+ * - `iconOnly`: never shows a label
+ * The label is always exposed via aria-label/title for screen readers and hover.
+ */
+function ToolButton({
+  icon: Icon,
+  label,
+  onClick,
+  primary = false,
+  compact = false,
+  iconOnly = false,
+  active = false,
+  disabled = false,
+}: {
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+  primary?: boolean;
+  compact?: boolean;
+  iconOnly?: boolean;
+  active?: boolean;
+  disabled?: boolean;
+}) {
+  const base = primary ? 'btn-primary' : 'btn-secondary';
+  const pad = iconOnly ? '!px-2.5' : compact ? '!px-2.5 sm:!px-3.5' : '';
+  const activeCls = active ? '!border-brand-400 !text-brand-700' : '';
+  return (
+    <button
+      type="button"
+      className={`${base} ${pad} ${activeCls} shadow`}
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      aria-pressed={active || undefined}
+      title={label}
+    >
+      <Icon className="h-4 w-4" aria-hidden="true" />
+      {!iconOnly && <span className={compact ? 'hidden sm:inline' : undefined}>{label}</span>}
+    </button>
+  );
 }
 
 export default function DesignTab({ project: p }: { project: Project }) {
@@ -102,50 +147,46 @@ export default function DesignTab({ project: p }: { project: Project }) {
             recenterKey={recenterKey}
           />
 
-          {/* floating toolbar */}
+          {/* floating toolbar: primary action keeps its label; secondary actions are icon-only on phones */}
           <div className="absolute left-14 right-3 top-3 z-[500] flex flex-wrap items-center gap-2 sm:right-auto">
             {!drawing ? (
               <>
-                <button className="btn-primary shadow" onClick={startDrawing}>
-                  <PenLine className="h-4 w-4" /> {d.roof.length ? 'Redraw roof' : 'Draw roof'}
-                </button>
+                <ToolButton primary icon={PenLine} label={d.roof.length ? 'Redraw roof' : 'Draw roof'} onClick={startDrawing} />
                 {d.roof.length >= 3 && (
                   <>
-                    <button className={`btn-secondary shadow ${editing ? '!border-brand-400 !text-brand-700' : ''}`} onClick={() => setEditing(!editing)}>
-                      <Move className="h-4 w-4" /> {editing ? 'Done editing' : 'Edit corners'}
-                    </button>
-                    <button
-                      className="btn-secondary shadow"
+                    <ToolButton
+                      icon={Move}
+                      label={editing ? 'Done editing' : 'Edit corners'}
+                      compact
+                      active={editing}
+                      onClick={() => setEditing(!editing)}
+                    />
+                    <ToolButton
+                      icon={Trash2}
+                      label="Clear roof"
+                      compact
                       onClick={() => {
                         setEditing(false);
                         updateDesign(p.id, { roof: [] });
                       }}
-                    >
-                      <Trash2 className="h-4 w-4" /> Clear
-                    </button>
+                    />
                   </>
                 )}
-                <button className="btn-secondary !px-2.5 shadow" title="Re-centre map" aria-label="Re-centre map" onClick={() => setRecenterKey((k) => k + 1)}>
-                  <RotateCcw className="h-4 w-4" />
-                </button>
+                <ToolButton icon={RotateCcw} label="Re-centre map" iconOnly onClick={() => setRecenterKey((k) => k + 1)} />
               </>
             ) : (
               <>
-                <button className="btn-primary shadow" onClick={finish} disabled={cleanRing(draft).length < 3}>
-                  <Check className="h-4 w-4" /> Finish
-                </button>
-                <button className="btn-secondary shadow" onClick={() => setDraft((c) => c.slice(0, -1))} disabled={!draft.length}>
-                  <Undo2 className="h-4 w-4" /> Undo
-                </button>
-                <button
-                  className="btn-secondary shadow"
+                <ToolButton primary icon={Check} label="Finish" onClick={finish} disabled={cleanRing(draft).length < 3} />
+                <ToolButton icon={Undo2} label="Undo" compact onClick={() => setDraft((c) => c.slice(0, -1))} disabled={!draft.length} />
+                <ToolButton
+                  icon={X}
+                  label="Cancel"
+                  compact
                   onClick={() => {
                     setDrawing(false);
                     setDraft([]);
                   }}
-                >
-                  <X className="h-4 w-4" /> Cancel
-                </button>
+                />
               </>
             )}
           </div>

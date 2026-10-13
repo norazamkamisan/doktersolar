@@ -88,7 +88,7 @@ export default function Layout() {
             />
           </form>
           <div className="ml-auto flex items-center gap-3">
-            <button className="btn-primary" onClick={() => setNewOpen(true)}>
+            <button className="btn-primary" onClick={() => setNewOpen(true)} aria-label="New Project" title="New Project">
               <Plus className="h-4 w-4" />
               <span className="hidden sm:inline">New Project</span>
             </button>
