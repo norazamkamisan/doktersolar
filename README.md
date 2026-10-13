@@ -4,7 +4,7 @@ A solar design and proposal studio: sketch a roof on satellite imagery, auto-fil
 
 [![Build](https://github.com/norazamkamisan/doktersolar/actions/workflows/build.yml/badge.svg)](https://github.com/norazamkamisan/doktersolar/actions/workflows/build.yml)
 
-**🔗 Live demo: [doktersolar.vercel.app](https://doktersolar.vercel.app)**
+**🔗 Live demo: [doktersolar.vercel.app](https://doktersolar.vercel.app)** (password-protected; see [Password protection](#password-protection))
 
 > Portfolio project. All names, branding, copy and UI are original.
 
@@ -58,6 +58,8 @@ Five sample projects in Malaysia are seeded on first load. Default currency is *
 ```
 doktersolar/
 ├─ vercel.json                  # Vercel build + SPA rewrite
+├─ middleware.js                # password login (Vercel Routing Middleware)
+├─ tests/middleware.test.mjs    # npm test
 ├─ api/pvwatts.js               # Vercel Function → /api/pvwatts
 ├─ server/pvwatts-core.mjs      # shared NREL PVWatts proxy logic (key stays server-side)
 ├─ netlify.toml                 # Netlify build + /api and SPA redirects (alternative host)
@@ -120,6 +122,12 @@ This captures all five images in `docs/screenshots/` from the live site using he
 - `npm run screenshots -- --site http://localhost:4173` captures a local `npm run preview` build. PVWatts falls back to the simple estimate there.
 - Set `BROWSER_PATH` to use a specific Chromium-based browser.
 
+If the site is password-protected, set the password in your terminal first so the script can sign in. It's only sent to the site's `/api/login`:
+
+```powershell
+$env:SITE_PASSWORD = 'your-password'
+```
+
 Each run adds a few page views to Vercel Analytics.
 
 ### Running the PVWatts function locally (optional)
@@ -173,9 +181,22 @@ The key is only read on the server (`server/pvwatts-core.mjs`, via `process.env.
 vercel --prod
 ```
 
+### Password protection
+
+The app sits behind one shared password, checked on Vercel's servers by [`middleware.js`](middleware.js) before any page or API is served.
+
+- **Set the password:** go to **Project → Settings → Environment Variables** and add `SITE_PASSWORD` as a **Secret** for Production (and Preview if you want previews protected too), then redeploy. Use a long password. There's no lockout, only a short delay after each wrong guess.
+- **If it's missing, the site stays closed:** without `SITE_PASSWORD` the app shows "Login isn't set up yet" instead of opening to everyone.
+- **What stays public:** shared proposal links (`/proposals/<id>`) open without a password so customers can view them. The `/proposals` list, every other page and `/api/pvwatts` need a sign-in.
+- **Sessions:** signing in sets a signed, HttpOnly cookie for 30 days. **Sign out** is at the bottom of the sidebar. Changing `SITE_PASSWORD` signs everyone out.
+- **Local development:** `npm run dev` and `npm run preview` don't run the middleware, so no password is needed locally.
+- **Tests:** `npm test` checks the middleware: redirects, sessions, wrong passwords, open-redirect protection and the closed-by-default behaviour. The GitHub build runs these tests too.
+
+Vercel's own "Password Protection" is a paid Pro feature. This middleware does the same job on the free Hobby plan.
+
 ### Deploying to Netlify instead
 
-`netlify.toml` is kept, so Netlify works with no changes. Import the repo in Netlify; the build settings and the `/api/* → /.netlify/functions/*` redirect come from the file. Set `NREL_API_KEY` under **Site configuration → Environment variables**.
+`netlify.toml` is kept, so Netlify works with no changes. Import the repo in Netlify; the build settings and the `/api/* → /.netlify/functions/*` redirect come from the file. Set `NREL_API_KEY` under **Site configuration → Environment variables**. The password login uses Vercel middleware, so a Netlify deploy is **not** password-protected.
 
 ---
 
