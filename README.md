@@ -2,6 +2,8 @@
 
 A solar design and proposal studio: sketch a roof on satellite imagery, auto-fill it with panels, estimate energy and savings, and send a printable customer proposal.
 
+**🔗 Live demo: [doktersolar.vercel.app](https://doktersolar.vercel.app)**
+
 > Portfolio project. All names, branding, copy and UI are original.
 
 **Stack:** React 18 · Vite · TypeScript · Tailwind CSS · React Router · Leaflet (react-leaflet) with Esri World Imagery · Recharts · localStorage · Vercel (+ an optional serverless function for NREL PVWatts). Netlify config is included too.
