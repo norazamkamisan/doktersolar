@@ -4,7 +4,7 @@ A solar design and proposal studio: sketch a roof on satellite imagery, auto-fil
 
 > Portfolio project. All names, branding, copy and UI are original.
 
-**Stack:** React 18 · Vite · TypeScript · Tailwind CSS · React Router · Leaflet (react-leaflet) with Esri World Imagery · Recharts · localStorage · Netlify (+ an optional Netlify Function for NREL PVWatts)
+**Stack:** React 18 · Vite · TypeScript · Tailwind CSS · React Router · Leaflet (react-leaflet) with Esri World Imagery · Recharts · localStorage · Vercel (+ an optional serverless function for NREL PVWatts). Netlify config is included too.
 
 ---
 
@@ -28,8 +28,11 @@ Five sample projects in Malaysia are seeded on first load. Default currency is *
 
 ```
 doktersolar/
-├─ netlify.toml                 # build + SPA redirect
-├─ netlify/functions/pvwatts.mjs  # optional NREL PVWatts proxy (key stays server-side)
+├─ vercel.json                  # Vercel build + SPA rewrite
+├─ api/pvwatts.js               # Vercel Function → /api/pvwatts
+├─ server/pvwatts-core.mjs      # shared NREL PVWatts proxy logic (key stays server-side)
+├─ netlify.toml                 # Netlify build + /api and SPA redirects (alternative host)
+├─ netlify/functions/pvwatts.mjs  # Netlify Function wrapper around the same core
 ├─ public/favicon.svg
 ├─ index.html
 ├─ src/
@@ -72,53 +75,52 @@ npm run preview
 
 ### Running the PVWatts function locally (optional)
 
-`npm run dev` runs the frontend only, so the **Get PVWatts estimate** button shows "function not available". To run the function too, use the Netlify CLI:
+`npm run dev` runs the frontend only, so the **Get PVWatts estimate** button shows "function not available". To run the function too, use the Vercel CLI:
 
 ```bash
-npm install -g netlify-cli
+npm install -g vercel
 ```
 
 Create a `.env` file (copy `.env.example`) containing `NREL_API_KEY=your-key`, then:
 
 ```bash
-netlify dev
+vercel dev
 ```
 
-This serves the app and `/.netlify/functions/pvwatts` together (usually at http://localhost:8888).
+This serves the app and `/api/pvwatts` together (usually at http://localhost:3000).
 
 Get a free NREL key at https://developer.nrel.gov/signup/.
 
 ---
 
-## Deploy to Netlify (step by step)
+## Deploy to Vercel (step by step)
 
-1. **Push to GitHub** (or GitLab/Bitbucket):
-   ```bash
-   git init
-   ```
-   ```bash
-   git add . && git commit -m "DokterSolar"
-   ```
-   Then create a repo and push.
-2. In **Netlify → Add new site → Import an existing project**, pick the repo.
-3. Netlify reads `netlify.toml`, so the settings fill in on their own:
+1. **Push the project to GitHub** (or GitLab/Bitbucket).
+2. Sign in at **https://vercel.com** (signing in with GitHub is easiest).
+3. Click **Add New… → Project**, find the repo under **Import Git Repository**, and click **Import**.
+4. Vercel reads `vercel.json`, so the settings fill in on their own:
+   - Framework preset: **Vite**
    - Build command: `npm run build`
-   - Publish directory: `dist`
-   - Functions directory: `netlify/functions`
-4. Click **Deploy**. The `/* → /index.html 200` redirect in `netlify.toml` makes deep links such as `/projects/demo-1/design` and shared proposal links work.
-5. **(Optional) Turn on PVWatts:**
-   1. Go to **Site configuration → Environment variables → Add a variable**.
-   2. Key: `NREL_API_KEY`, Value: your NREL key. Scope: at least *Functions*.
-   3. Go to **Deploys → Trigger deploy → Deploy site** so the function picks it up.
-   4. Open a project's **Energy** tab and click **Get PVWatts estimate**.
+   - Output directory: `dist`
+5. **(Optional) Turn on PVWatts now:** open **Environment Variables** on the same screen and add `NREL_API_KEY` = your NREL key.
+6. Click **Deploy**. After a minute you get a URL like `https://doktersolar.vercel.app`.
+   - The rewrite in `vercel.json` sends every non-`/api` path to `index.html`, so deep links such as `/projects/demo-1/design` and shared proposal links work.
+   - `api/pvwatts.js` deploys automatically as a function at `/api/pvwatts`.
+7. Every push to `main` redeploys. Pushes to other branches get their own preview URLs.
 
-   The key is only read inside `netlify/functions/pvwatts.mjs` (`process.env.NREL_API_KEY`). It is never bundled into the frontend. Don't prefix it with `VITE_`.
+**Adding the key later:** go to **Project → Settings → Environment Variables**, add `NREL_API_KEY` (for Production, plus Preview if you want it there too), then **Deployments → ⋯ → Redeploy**. Environment variables only apply to new deployments.
+
+The key is only read on the server (`server/pvwatts-core.mjs`, via `process.env.NREL_API_KEY`). It is never bundled into the frontend. Don't prefix it with `VITE_`.
 
 **Alternative (CLI deploy):**
 
 ```bash
-netlify deploy --build --prod
+vercel --prod
 ```
+
+### Deploying to Netlify instead
+
+`netlify.toml` is kept, so Netlify works with no changes. Import the repo in Netlify; the build settings and the `/api/* → /.netlify/functions/*` redirect come from the file. Set `NREL_API_KEY` under **Site configuration → Environment variables**.
 
 ---
 

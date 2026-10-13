@@ -6,8 +6,13 @@
 [build.environment]
   NODE_VERSION = "20"
 
-# Client-side routing: serve index.html for every path.
-# Netlify Functions (/.netlify/functions/*) are matched before this rule.
+# Same API path as Vercel: /api/pvwatts → the Netlify Function.
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+# Client-side routing: serve index.html for every other path.
 [[redirects]]
   from = "/*"
   to = "/index.html"

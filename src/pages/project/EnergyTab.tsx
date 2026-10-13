@@ -101,7 +101,7 @@ export default function EnergyTab({ project: p }: { project: Project }) {
             <h3 className="font-semibold text-slate-900">NREL PVWatts</h3>
           </div>
           <p className="text-xs text-slate-500">
-            Uses weather data for this location via the site's Netlify Function. Requires <code>NREL_API_KEY</code> to be set on Netlify.
+            Uses weather data for this location via the site's serverless function. Requires <code>NREL_API_KEY</code> to be set in the hosting environment.
           </p>
           <button className="btn-secondary w-full" onClick={runPvWatts} disabled={busy}>
             {busy && <Loader2 className="h-4 w-4 animate-spin" />}

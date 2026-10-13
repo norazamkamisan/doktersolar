@@ -10,7 +10,7 @@ export async function geocode(address: string): Promise<{ lat: number; lng: numb
   return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon), label: data[0].display_name };
 }
 
-/** Calls our Netlify Function, which holds the NREL key server-side. */
+/** Calls our serverless function (Vercel or Netlify), which holds the NREL key server-side. */
 export async function fetchPvWatts(p: Project): Promise<PvWattsResult> {
   if (p.lat == null || p.lng == null) throw new Error('Project has no location yet.');
   if (p.systemKw <= 0) throw new Error('Design a system first (no panels placed).');
@@ -21,13 +21,13 @@ export async function fetchPvWatts(p: Project): Promise<PvWattsResult> {
     tilt: String(p.design.tilt),
     azimuth: String(p.design.azimuth),
   });
-  const res = await fetch(`/.netlify/functions/pvwatts?${q}`);
+  const res = await fetch(`/api/pvwatts?${q}`);
   const text = await res.text();
   let body: { annual?: number; monthly?: number[]; error?: string } = {};
   try {
     body = JSON.parse(text);
   } catch {
-    throw new Error('PVWatts function is not available here (run with `netlify dev` or deploy to Netlify).');
+    throw new Error('PVWatts function is not available here (run with `vercel dev`, or use the deployed site).');
   }
   if (!res.ok || body.error) throw new Error(body.error ?? `PVWatts request failed (${res.status})`);
   return { annual: body.annual!, monthly: body.monthly!, fetchedAt: new Date().toISOString() };
