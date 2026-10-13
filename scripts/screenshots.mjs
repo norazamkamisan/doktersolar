@@ -190,8 +190,11 @@ async function main() {
         const p = projects.find((x) => x.id === '${PROJECT}');
         const q = new URLSearchParams({ lat: p.lat, lon: p.lng, system_capacity: p.systemKw.toFixed(3), tilt: p.design.tilt, azimuth: p.design.azimuth });
         const res = await fetch('/api/pvwatts?' + q);
-        const body = await res.json().catch(() => ({}));
+        const body = await res.json().catch(() => null);
+        // Hosts without the function (e.g. vite preview) answer with the SPA's index.html and a 200.
+        if (!body) return { error: 'no PVWatts function at ' + location.origin + '/api/pvwatts' };
         if (!res.ok) return { error: body.error || 'HTTP ' + res.status };
+        if (typeof body.annual !== 'number' || !Array.isArray(body.monthly)) return { error: 'unexpected PVWatts response' };
         p.energy = { ...p.energy, usePvWatts: true, pvwatts: { annual: body.annual, monthly: body.monthly, fetchedAt: new Date().toISOString() } };
         localStorage.setItem(KEY, JSON.stringify(projects));
         return { annual: Math.round(body.annual) };
