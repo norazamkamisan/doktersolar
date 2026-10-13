@@ -6,6 +6,31 @@ A solar design and proposal studio: sketch a roof on satellite imagery, auto-fil
 
 > Portfolio project. All names, branding, copy and UI are original.
 
+![DokterSolar dashboard](docs/screenshots/dashboard.png)
+
+## Screenshots
+
+**Design tool**: draw the roof on satellite imagery and panels fill it automatically. Panel count and system size update live as you change the settings.
+
+![Design tool with roof polygon and auto-filled panels](docs/screenshots/design-tool.png)
+
+**Energy & savings**: monthly production, payback, 25-year savings and editable assumptions.
+
+![Energy and savings tab](docs/screenshots/energy.png)
+
+<table>
+  <tr>
+    <td width="70%" valign="top">
+      <strong>Customer proposal</strong>: printable and shareable, with a map snapshot, key numbers and charts.<br><br>
+      <img src="docs/screenshots/proposal.png" alt="Customer proposal page">
+    </td>
+    <td width="30%" valign="top">
+      <strong>Mobile</strong>: fully responsive.<br><br>
+      <img src="docs/screenshots/mobile.png" alt="Dashboard on a phone">
+    </td>
+  </tr>
+</table>
+
 **Stack:** React 18 · Vite · TypeScript · Tailwind CSS · React Router · Leaflet (react-leaflet) with Esri World Imagery · Recharts · localStorage · Vercel (+ an optional serverless function for NREL PVWatts). Netlify config is included too.
 
 ---
@@ -35,6 +60,7 @@ doktersolar/
 ├─ server/pvwatts-core.mjs      # shared NREL PVWatts proxy logic (key stays server-side)
 ├─ netlify.toml                 # Netlify build + /api and SPA redirects (alternative host)
 ├─ netlify/functions/pvwatts.mjs  # Netlify Function wrapper around the same core
+├─ docs/screenshots/            # README images
 ├─ public/favicon.svg
 ├─ index.html
 ├─ src/
