@@ -63,6 +63,7 @@ doktersolar/
 ├─ netlify.toml                 # Netlify build + /api and SPA redirects (alternative host)
 ├─ netlify/functions/pvwatts.mjs  # Netlify Function wrapper around the same core
 ├─ docs/screenshots/            # README images
+├─ scripts/screenshots.mjs      # regenerates them: npm run screenshots
 ├─ public/favicon.svg
 ├─ index.html
 ├─ src/
@@ -106,6 +107,20 @@ npm run preview
 ```bash
 npm run typecheck
 ```
+
+### Updating the README screenshots
+
+```bash
+npm run screenshots
+```
+
+This captures all five images in `docs/screenshots/` from the live site using headless Edge or Chrome, with no extra dependencies. It needs **Node.js 22+**. Before capturing, it fetches real PVWatts data for the Priya Nair demo project through the site's `/api/pvwatts`, which uses one request against your key. Options:
+
+- `npm run screenshots -- --no-pvwatts` uses the simple estimate instead.
+- `npm run screenshots -- --site http://localhost:4173` captures a local `npm run preview` build. PVWatts falls back to the simple estimate there.
+- Set `BROWSER_PATH` to use a specific Chromium-based browser.
+
+Each run adds a few page views to Vercel Analytics.
 
 ### Running the PVWatts function locally (optional)
 
