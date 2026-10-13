@@ -16,7 +16,7 @@ A solar design and proposal studio: sketch a roof on satellite imagery, auto-fil
 
 ![Design tool with roof polygon and auto-filled panels](docs/screenshots/design-tool.png)
 
-**Energy & savings**: monthly production, payback, 25-year savings and editable assumptions.
+**Energy & savings**: monthly production, payback, 25-year savings and editable assumptions. Shown here with real weather-based figures from PVWatts (NLR) for Shah Alam.
 
 ![Energy and savings tab](docs/screenshots/energy.png)
 
