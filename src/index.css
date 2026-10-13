@@ -88,4 +88,11 @@
   .leaflet-control-container {
     display: none;
   }
+  /* Charts are sized for the screen; scale them to the printed page width (their SVGs have a viewBox). */
+  .recharts-responsive-container,
+  .recharts-wrapper,
+  .recharts-wrapper > svg.recharts-surface {
+    width: 100% !important;
+    height: auto !important;
+  }
 }

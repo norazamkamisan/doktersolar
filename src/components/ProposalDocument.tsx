@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { forwardRef, useMemo } from 'react';
 import type { Project, Settings } from '../types';
 import { MONTHS, energyFor, financialsFor, layoutPanels } from '../lib/solar';
 import { date, money, num } from '../lib/format';
@@ -17,7 +17,11 @@ function Metric({ label, value, accent = false }: { label: string; value: string
   );
 }
 
-export default function ProposalDocument({ project: p, settings: s }: { project: Project; settings: DocSettings }) {
+/** Each direct child of the <article> becomes one unbreakable block in the downloaded PDF (see lib/pdf.ts). */
+const ProposalDocument = forwardRef<HTMLElement, { project: Project; settings: DocSettings }>(function ProposalDocument(
+  { project: p, settings: s },
+  ref,
+) {
   const layout = useMemo(() => layoutPanels(p.design), [p.design]);
   const energy = energyFor(p);
   const fin = financialsFor(p, energy.annualKwh);
@@ -26,7 +30,7 @@ export default function ProposalDocument({ project: p, settings: s }: { project:
   const center = p.lat != null && p.lng != null ? ([p.lat, p.lng] as [number, number]) : null;
 
   return (
-    <article className="print-page mx-auto max-w-4xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-10">
+    <article ref={ref} className="print-page mx-auto max-w-4xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-10">
       {/* header */}
       <header className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-6">
         <div className="flex items-center gap-3">
@@ -154,4 +158,6 @@ export default function ProposalDocument({ project: p, settings: s }: { project:
       </footer>
     </article>
   );
-}
+});
+
+export default ProposalDocument;

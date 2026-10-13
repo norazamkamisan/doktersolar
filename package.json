@@ -15,6 +15,8 @@
     "@vercel/analytics": "2.0.1",
     "@vercel/functions": "3.9.9",
     "@vercel/speed-insights": "2.0.0",
+    "html-to-image": "1.11.13",
+    "jspdf": "4.2.1",
     "leaflet": "1.9.4",
     "lucide-react": "0.460.0",
     "react": "18.3.1",

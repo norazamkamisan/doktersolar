@@ -1,26 +1,15 @@
-import { useState } from 'react';
+import { useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, Copy, ExternalLink, Send } from 'lucide-react';
+import { ExternalLink, Send } from 'lucide-react';
 import type { Project } from '../../types';
 import { updateProject, useSettings } from '../../lib/store';
-import { shareUrl } from '../../lib/api';
 import { date } from '../../lib/format';
 import ProposalDocument from '../../components/ProposalDocument';
+import ProposalActions from '../../components/ProposalActions';
 
 export default function ProposalTab({ project: p }: { project: Project }) {
   const settings = useSettings();
-  const [copied, setCopied] = useState(false);
-
-  const copy = async () => {
-    const url = shareUrl(p, settings);
-    try {
-      await navigator.clipboard.writeText(url);
-    } catch {
-      prompt('Copy this link:', url);
-    }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+  const docRef = useRef<HTMLElement>(null);
 
   const markSent = () => updateProject(p.id, { status: 'Proposal Sent', proposalSentAt: new Date().toISOString() });
 
@@ -36,22 +25,19 @@ export default function ProposalTab({ project: p }: { project: Project }) {
             'Preview the proposal your customer will see.'
           )}
         </p>
-        <div className="flex flex-wrap gap-2">
-          <button className="btn-secondary" onClick={copy}>
-            {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
-            {copied ? 'Link copied' : 'Copy share link'}
-          </button>
-          <Link to={`/proposals/${p.id}`} className="btn-secondary">
-            <ExternalLink className="h-4 w-4" /> Open / Export PDF
+        <div className="flex flex-wrap items-start justify-end gap-2">
+          <Link to={`/proposals/${p.id}`} className="btn-secondary !px-2.5" title="Open customer view" aria-label="Open customer view">
+            <ExternalLink className="h-4 w-4" />
           </Link>
           {['Lead', 'Designing'].includes(p.status) && (
-            <button className="btn-primary" onClick={markSent} disabled={p.systemKw <= 0}>
+            <button className="btn-secondary" onClick={markSent} disabled={p.systemKw <= 0}>
               <Send className="h-4 w-4" /> Mark as sent
             </button>
           )}
+          <ProposalActions project={p} settings={settings} documentRef={docRef} compact />
         </div>
       </div>
-      <ProposalDocument project={p} settings={settings} />
+      <ProposalDocument ref={docRef} project={p} settings={settings} />
     </div>
   );
 }

@@ -44,32 +44,86 @@ export interface SharePayload {
   s: Omit<Settings, 'logo'>;
 }
 
-function toBase64Url(str: string): string {
-  const bytes = new TextEncoder().encode(str);
+// Two fragment formats:
+//   #z=<base64url(deflate-raw(JSON))>   compressed, about half the length (current)
+//   #d=<base64url(JSON)>                uncompressed (older links, and browsers without CompressionStream)
+
+function bytesToBase64Url(bytes: Uint8Array): string {
   let bin = '';
   bytes.forEach((b) => (bin += String.fromCharCode(b)));
   return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-function fromBase64Url(b64: string): string {
+function base64UrlToBytes(b64: string): Uint8Array {
   const bin = atob(b64.replace(/-/g, '+').replace(/_/g, '/'));
-  return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
+  return Uint8Array.from(bin, (c) => c.charCodeAt(0));
 }
 
-export function shareUrl(p: Project, s: Settings): string {
+async function pipeBytes(bytes: Uint8Array, stream: CompressionStream | DecompressionStream): Promise<Uint8Array> {
+  const out = new Blob([bytes]).stream().pipeThrough(stream);
+  return new Uint8Array(await new Response(out).arrayBuffer());
+}
+
+function buildPayload(p: Project, s: Settings): SharePayload {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { logo: _logo, ...rest } = s;
   const roundedRoof = p.design.roof.map(([a, b]) => [+a.toFixed(7), +b.toFixed(7)] as [number, number]);
-  const payload: SharePayload = { p: { ...p, notes: '', design: { ...p.design, roof: roundedRoof } }, s: rest };
-  return `${window.location.origin}/proposals/${p.id}#d=${toBase64Url(JSON.stringify(payload))}`;
+  return { p: { ...p, notes: '', design: { ...p.design, roof: roundedRoof } }, s: rest };
 }
 
-export function readSharePayload(hash: string): SharePayload | null {
-  const m = hash.match(/d=([A-Za-z0-9_-]+)/);
+/** The `#z=…` (or `#d=…`) fragment that carries a proposal. */
+export async function shareFragment(p: Project, s: Settings): Promise<string> {
+  const json = new TextEncoder().encode(JSON.stringify(buildPayload(p, s)));
+  if (typeof CompressionStream !== 'undefined') {
+    try {
+      return `#z=${bytesToBase64Url(await pipeBytes(json, new CompressionStream('deflate-raw')))}`;
+    } catch {
+      /* fall through to the uncompressed format */
+    }
+  }
+  return `#d=${bytesToBase64Url(json)}`;
+}
+
+export async function shareUrl(p: Project, s: Settings): Promise<string> {
+  return `${window.location.origin}/proposals/${p.id}${await shareFragment(p, s)}`;
+}
+
+export async function readSharePayload(hash: string): Promise<SharePayload | null> {
+  const m = hash.match(/(?:^#|&)([zd])=([A-Za-z0-9_-]+)/);
   if (!m) return null;
   try {
-    return JSON.parse(fromBase64Url(m[1])) as SharePayload;
+    let bytes = base64UrlToBytes(m[2]);
+    if (m[1] === 'z') bytes = await pipeBytes(bytes, new DecompressionStream('deflate-raw'));
+    return JSON.parse(new TextDecoder().decode(bytes)) as SharePayload;
   } catch {
     return null;
   }
+}
+
+/**
+ * Share a proposal link. On phones this opens the native share sheet (WhatsApp, email, …);
+ * elsewhere it copies to the clipboard. Returns what happened.
+ */
+export async function shareProposal(
+  p: Project,
+  s: Pick<Settings, 'companyName'>,
+  url?: string,
+): Promise<'shared' | 'copied' | 'cancelled'> {
+  url ??= await shareUrl(p, s as Settings);
+  const coarsePointer = window.matchMedia?.('(pointer: coarse)').matches;
+  if (coarsePointer && typeof navigator.share === 'function') {
+    try {
+      await navigator.share({ title: `Solar proposal for ${p.customerName}`, text: `Your solar proposal from ${s.companyName}`, url });
+      return 'shared';
+    } catch (err) {
+      if ((err as Error).name === 'AbortError') return 'cancelled';
+      /* share sheet unavailable: fall back to copying */
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+  } catch {
+    window.prompt('Copy this link:', url);
+  }
+  return 'copied';
 }
