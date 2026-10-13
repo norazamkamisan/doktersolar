@@ -11,6 +11,9 @@
 //
 // PVWatts data is fetched through the site's own /api/pvwatts endpoint (one request),
 // so it only works where that function has NREL_API_KEY configured.
+//
+// If the site is password-protected, set SITE_PASSWORD in your environment first
+// (PowerShell: $env:SITE_PASSWORD = '...'). It is only sent to the site's /api/login.
 
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -180,6 +183,19 @@ async function main() {
 
     // A fresh profile, so the first visit seeds the 5 demo projects.
     await goto('/home');
+
+    // Password-protected site (middleware.js): sign in with SITE_PASSWORD from the environment.
+    if ((await evaluate('location.pathname')) === '/login') {
+      const password = process.env.SITE_PASSWORD;
+      if (!password) throw new Error('The site is password-protected. Set SITE_PASSWORD in your environment and re-run.');
+      const ok = await evaluate(`(async () => {
+        const res = await fetch('/api/login', { method: 'POST', body: new URLSearchParams({ password: ${JSON.stringify(password)}, next: '/home' }) });
+        return new URL(res.url).pathname === '/home';
+      })()`);
+      if (!ok) throw new Error('Sign-in failed: SITE_PASSWORD does not match the site password.');
+      console.log('Signed in.\n');
+      await goto('/home');
+    }
     await settle(false);
 
     if (WITH_PVWATTS) {

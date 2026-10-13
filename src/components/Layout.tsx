@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { FileText, FolderKanban, Home, LayoutGrid, Menu, Plus, Search, Settings, UserPlus, X } from 'lucide-react';
+import { FileText, FolderKanban, Home, LayoutGrid, LogOut, Menu, Plus, Search, Settings, UserPlus, X } from 'lucide-react';
 import { BrandLogo } from './Logo';
 import NewProjectModal from './NewProjectModal';
 import { useSettings } from '../lib/store';
@@ -49,8 +49,18 @@ export default function Layout() {
           {label}
         </NavLink>
       ))}
-      <div className="mt-auto rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
-        Data is stored in this browser. Reset demo data in Settings.
+      <div className="mt-auto space-y-2">
+        <div className="rounded-lg bg-slate-50 p-3 text-xs text-slate-500">Data is stored in this browser. Reset demo data in Settings.</div>
+        {/* /logout is handled by middleware.js on Vercel, so it only exists in production builds */}
+        {import.meta.env.PROD && (
+          <a
+            href="/logout"
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+          >
+            <LogOut className="h-[18px] w-[18px]" />
+            Sign out
+          </a>
+        )}
       </div>
     </nav>
   );

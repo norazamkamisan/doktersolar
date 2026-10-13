@@ -7,11 +7,13 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
+    "test": "node --test tests/middleware.test.mjs",
     "screenshots": "node scripts/screenshots.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
     "@vercel/analytics": "2.0.1",
+    "@vercel/functions": "3.9.9",
     "@vercel/speed-insights": "2.0.0",
     "leaflet": "1.9.4",
     "lucide-react": "0.460.0",

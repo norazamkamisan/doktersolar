@@ -37,6 +37,9 @@ jobs:
       - name: Type-check and build
         run: npm run build
 
+      - name: Test password-protection middleware
+        run: npm test
+
       - name: Check serverless functions load
         run: |
           node --check server/pvwatts-core.mjs
