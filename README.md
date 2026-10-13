@@ -2,6 +2,8 @@
 
 A solar design and proposal studio: sketch a roof on satellite imagery, auto-fill it with panels, estimate energy and savings, and send a printable customer proposal.
 
+[![Build](https://github.com/norazamkamisan/doktersolar/actions/workflows/build.yml/badge.svg)](https://github.com/norazamkamisan/doktersolar/actions/workflows/build.yml)
+
 **🔗 Live demo: [doktersolar.vercel.app](https://doktersolar.vercel.app)**
 
 > Portfolio project. All names, branding, copy and UI are original.
