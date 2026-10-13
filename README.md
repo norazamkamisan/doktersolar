@@ -103,6 +103,10 @@ npm run build
 npm run preview
 ```
 
+```bash
+npm run typecheck
+```
+
 ### Running the PVWatts function locally (optional)
 
 `npm run dev` runs the frontend only, so the **Get PVWatts estimate** button shows "function not available". To run the function too, use the Vercel CLI:
