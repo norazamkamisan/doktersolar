@@ -21,8 +21,8 @@ export default function InfoTab({ project: p }: { project: Project }) {
       const r = await geocode(p.address);
       if (r) {
         updateProject(p.id, { lat: r.lat, lng: r.lng });
-        setMsg(`Located: ${r.label}`);
-      } else setMsg('Address not found — try adding city/postcode, or pan the map in the Design tab.');
+        setMsg(r.approximate ? `Closest match: ${r.label}. Check it on the Design tab.` : `Located: ${r.label}`);
+      } else setMsg('Address not found. Try adding the town or postcode, or pan the map in the Design tab.');
     } catch (err) {
       setMsg((err as Error).message);
     }

@@ -77,6 +77,7 @@ export default function DesignTab({ project: p }: { project: Project }) {
   const [query, setQuery] = useState(p.address);
   const [searching, setSearching] = useState(false);
   const [searchMsg, setSearchMsg] = useState('');
+  const [searchInfo, setSearchInfo] = useState('');
   const [recenterKey, setRecenterKey] = useState(0);
 
   const layout = useMemo(() => layoutPanels(d), [d]);
@@ -89,12 +90,14 @@ export default function DesignTab({ project: p }: { project: Project }) {
     if (!query.trim()) return;
     setSearching(true);
     setSearchMsg('');
+    setSearchInfo('');
     try {
       const r = await geocode(query);
       if (r) {
         updateProject(p.id, { lat: r.lat, lng: r.lng, address: query });
         setRecenterKey((k) => k + 1);
-      } else setSearchMsg('No match found. Try adding the city or postcode.');
+        if (r.approximate) setSearchInfo(`Closest match: ${r.label}. Check it's the right building before drawing.`);
+      } else setSearchMsg('No match found. Try adding the town or postcode, e.g. "Jalan Tun Dr. Ismail, Seremban".');
     } catch (err) {
       setSearchMsg((err as Error).message);
     }
@@ -131,6 +134,15 @@ export default function DesignTab({ project: p }: { project: Project }) {
           </button>
         </form>
         {searchMsg && <p className="text-xs text-red-600">{searchMsg}</p>}
+        {searchInfo && <p className="text-xs text-amber-700">{searchInfo}</p>}
+        {!center && !drawing && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800" role="status">
+            <strong>This project has no map location yet.</strong>{' '}
+            {d.roof.length >= 3
+              ? 'The roof below may be in the wrong place. Search for the address above to check.'
+              : "Search for the address above before drawing the roof. If it isn't found, add the town or postcode."}
+          </div>
+        )}
 
         <div className="relative">
           <SolarMap
