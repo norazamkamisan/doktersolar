@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { forwardRef, useMemo } from 'react';
 import type { Project, Settings } from '../types';
 import { MONTHS, energyFor, financialsFor, layoutPanels } from '../lib/solar';
 import { date, money, num } from '../lib/format';
@@ -6,7 +6,7 @@ import SolarMap from './SolarMap';
 import { LogoMark } from './Logo';
 import { CashflowChart, MonthlyProductionChart } from './Charts';
 
-type DocSettings = Omit<Settings, 'logo'> & { logo?: string | null };
+export type DocSettings = Omit<Settings, 'logo'> & { logo?: string | null };
 
 function Metric({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
   return (
@@ -17,7 +17,17 @@ function Metric({ label, value, accent = false }: { label: string; value: string
   );
 }
 
-export default function ProposalDocument({ project: p, settings: s }: { project: Project; settings: DocSettings }) {
+/** Each direct child of the <article> becomes one unbreakable block in the downloaded PDF (see lib/pdf.ts). */
+/**
+ * `forExport`: fixed desktop layout (no screen-width breakpoints, no card frame), used for the
+ * off-screen copy that becomes the downloaded PDF, so phones and desktops get the same document.
+ */
+const ProposalDocument = forwardRef<HTMLElement, { project: Project; settings: DocSettings; forExport?: boolean }>(function ProposalDocument(
+  { project: p, settings: s, forExport = false },
+  ref,
+) {
+  /** pick the responsive classes on screen, or their desktop equivalents for export */
+  const r = (screen: string, exported: string) => (forExport ? exported : screen);
   const layout = useMemo(() => layoutPanels(p.design), [p.design]);
   const energy = energyFor(p);
   const fin = financialsFor(p, energy.annualKwh);
@@ -26,7 +36,10 @@ export default function ProposalDocument({ project: p, settings: s }: { project:
   const center = p.lat != null && p.lng != null ? ([p.lat, p.lng] as [number, number]) : null;
 
   return (
-    <article className="print-page mx-auto max-w-4xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-10">
+    <article
+      ref={ref}
+      className={r('print-page mx-auto max-w-4xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-10', 'bg-white px-2 py-1')}
+    >
       {/* header */}
       <header className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-6">
         <div className="flex items-center gap-3">
@@ -48,14 +61,14 @@ export default function ProposalDocument({ project: p, settings: s }: { project:
       </header>
 
       {/* customer */}
-      <section className="avoid-break grid gap-6 py-6 sm:grid-cols-2">
+      <section className={`avoid-break grid gap-6 py-6 ${r('sm:grid-cols-2', 'grid-cols-2')}`}>
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Prepared for</p>
           <p className="mt-1 text-lg font-semibold text-slate-900">{p.customerName}</p>
           <p className="text-sm text-slate-600">{p.address}</p>
           <p className="text-sm text-slate-600">{[p.email, p.phone].filter(Boolean).join(' · ')}</p>
         </div>
-        <div className="sm:text-right">
+        <div className={r('sm:text-right', 'text-right')}>
           <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Prepared by</p>
           <p className="mt-1 text-lg font-semibold text-slate-900">{s.companyName}</p>
           <p className="text-sm text-slate-600">{s.companyEmail}</p>
@@ -66,7 +79,7 @@ export default function ProposalDocument({ project: p, settings: s }: { project:
       {/* headline */}
       <section className="avoid-break rounded-2xl bg-gradient-to-br from-brand-500 to-brand-600 p-6 text-white">
         <p className="text-sm text-brand-100">Your recommended system</p>
-        <p className="mt-1 text-3xl font-semibold tracking-tight sm:text-4xl">
+        <p className={`mt-1 font-semibold tracking-tight ${r('text-3xl sm:text-4xl', 'text-4xl')}`}>
           {num(p.systemKw, 2)} kWp · {p.panelCount} panels
         </p>
         <p className="mt-2 text-sm text-brand-50">
@@ -80,14 +93,14 @@ export default function ProposalDocument({ project: p, settings: s }: { project:
       <section className="avoid-break mt-6">
         <h2 className="mb-3 text-lg font-semibold text-slate-900">Panel layout</h2>
         {p.design.roof.length >= 3 ? (
-          <SolarMap center={center} roof={p.design.roof} panels={layout.panels} staticView className="h-[340px] sm:h-[400px]" />
+          <SolarMap center={center} roof={p.design.roof} panels={layout.panels} staticView className={r('h-[340px] sm:h-[400px]', 'h-[400px]')} />
         ) : (
           <p className="rounded-xl bg-slate-50 p-6 text-sm text-slate-500">Roof layout not yet drawn.</p>
         )}
       </section>
 
       {/* key numbers */}
-      <section className="avoid-break mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <section className={`avoid-break mt-6 grid gap-3 ${r('grid-cols-2 md:grid-cols-4', 'grid-cols-4')}`}>
         <Metric label="System size" value={`${num(p.systemKw, 2)} kWp`} />
         <Metric label="Annual production" value={`${num(energy.annualKwh)} kWh`} />
         <Metric label="System cost" value={money(fin.systemCost, s.currency)} />
@@ -99,7 +112,7 @@ export default function ProposalDocument({ project: p, settings: s }: { project:
       </section>
 
       {/* charts */}
-      <section className="mt-8 grid gap-6 md:grid-cols-2">
+      <section className={`mt-8 grid gap-6 ${r('md:grid-cols-2', 'grid-cols-2')}`}>
         <div className="avoid-break">
           <h2 className="text-base font-semibold text-slate-900">Monthly production</h2>
           <p className="mb-3 text-xs text-slate-500">Estimated kWh per month</p>
@@ -138,7 +151,7 @@ export default function ProposalDocument({ project: p, settings: s }: { project:
       </section>
 
       {/* acceptance */}
-      <section className="avoid-break mt-8 grid gap-8 sm:grid-cols-2">
+      <section className={`avoid-break mt-8 grid gap-8 ${r('sm:grid-cols-2', 'grid-cols-2')}`}>
         {['Customer signature', 'Date'].map((l) => (
           <div key={l}>
             <div className="h-12 border-b border-slate-300" />
@@ -154,4 +167,6 @@ export default function ProposalDocument({ project: p, settings: s }: { project:
       </footer>
     </article>
   );
-}
+});
+
+export default ProposalDocument;
