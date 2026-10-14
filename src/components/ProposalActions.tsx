@@ -1,23 +1,23 @@
-import { useState, type RefObject } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Check, Download, Loader2, Printer, Share2 } from 'lucide-react';
-import type { Project, Settings } from '../types';
+import type { Project } from '../types';
 import { shareProposal } from '../lib/api';
-import { downloadProposalPdf, proposalFileName } from '../lib/pdf';
+import { PDF_FONT_STACK, PDF_RENDER_WIDTH, downloadProposalPdf, proposalFileName, waitForRender } from '../lib/pdf';
+import ProposalDocument, { type DocSettings } from './ProposalDocument';
 
 /**
- * Share link + Download PDF + Print buttons for a proposal.
+ * Share link + Print + Download PDF buttons for a proposal.
  * `shareUrl` overrides the link (e.g. a customer re-sharing the link they received).
  */
 export default function ProposalActions({
   project,
   settings,
-  documentRef,
   shareUrl,
   compact = false,
 }: {
   project: Project;
-  settings: Pick<Settings, 'companyName'>;
-  documentRef: RefObject<HTMLElement>;
+  settings: DocSettings;
   shareUrl?: string;
   compact?: boolean;
 }) {
@@ -29,18 +29,6 @@ export default function ProposalActions({
     if (result === 'cancelled') return;
     setShareState(result);
     setTimeout(() => setShareState('idle'), 2500);
-  };
-
-  const download = async () => {
-    if (!documentRef.current || pdfState === 'busy') return;
-    setPdfState('busy');
-    try {
-      await downloadProposalPdf(documentRef.current, proposalFileName(project.customerName));
-      setPdfState('idle');
-    } catch (err) {
-      console.error('PDF export failed', err);
-      setPdfState('error');
-    }
   };
 
   return (
@@ -60,7 +48,7 @@ export default function ProposalActions({
           <Printer className="h-4 w-4" />
           {!compact && <span className="hidden sm:inline">Print</span>}
         </button>
-        <button type="button" className="btn-primary" onClick={download} disabled={pdfState === 'busy'}>
+        <button type="button" className="btn-primary" onClick={() => setPdfState('busy')} disabled={pdfState === 'busy'}>
           {pdfState === 'busy' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
           {pdfState === 'busy' ? 'Creating PDF…' : 'Download PDF'}
         </button>
@@ -70,6 +58,60 @@ export default function ProposalActions({
           Couldn't create the PDF. Try again, or use Print → Save as PDF.
         </p>
       )}
+      {pdfState === 'busy' && (
+        <PdfExport
+          project={project}
+          settings={settings}
+          onDone={(ok) => setPdfState(ok ? 'idle' : 'error')}
+        />
+      )}
     </div>
+  );
+}
+
+/**
+ * Renders the proposal off-screen at a fixed width with system fonts, captures it to a PDF,
+ * then reports back. Same result on phones and desktops.
+ */
+function PdfExport({ project, settings, onDone }: { project: Project; settings: DocSettings; onDone: (ok: boolean) => void }) {
+  const ref = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!ref.current) throw new Error('Proposal did not render');
+        await waitForRender(ref.current);
+        if (cancelled) return;
+        await downloadProposalPdf(ref.current, proposalFileName(project.customerName));
+        if (!cancelled) onDone(true);
+      } catch (err) {
+        console.error('PDF export failed', err);
+        if (!cancelled) onDone(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // run once per export
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return createPortal(
+    <div
+      aria-hidden="true"
+      style={{
+        position: 'fixed',
+        left: -20000,
+        top: 0,
+        width: PDF_RENDER_WIDTH,
+        fontFamily: PDF_FONT_STACK,
+        pointerEvents: 'none',
+        background: '#fff',
+      }}
+    >
+      <ProposalDocument ref={ref} project={project} settings={settings} forExport />
+    </div>,
+    document.body,
   );
 }

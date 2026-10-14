@@ -1,4 +1,3 @@
-import { useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ExternalLink, Send } from 'lucide-react';
 import type { Project } from '../../types';
@@ -9,7 +8,6 @@ import ProposalActions from '../../components/ProposalActions';
 
 export default function ProposalTab({ project: p }: { project: Project }) {
   const settings = useSettings();
-  const docRef = useRef<HTMLElement>(null);
 
   const markSent = () => updateProject(p.id, { status: 'Proposal Sent', proposalSentAt: new Date().toISOString() });
 
@@ -34,10 +32,10 @@ export default function ProposalTab({ project: p }: { project: Project }) {
               <Send className="h-4 w-4" /> Mark as sent
             </button>
           )}
-          <ProposalActions project={p} settings={settings} documentRef={docRef} compact />
+          <ProposalActions project={p} settings={settings} compact />
         </div>
       </div>
-      <ProposalDocument ref={docRef} project={p} settings={settings} />
+      <ProposalDocument project={p} settings={settings} />
     </div>
   );
 }

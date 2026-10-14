@@ -1,13 +1,26 @@
 import type { Project, PvWattsResult, Settings } from '../types';
 
 /** Free geocoding via OpenStreetMap Nominatim (max ~1 request/second). */
-export async function geocode(address: string): Promise<{ lat: number; lng: number; label: string } | null> {
+export async function geocode(
+  address: string,
+  timeoutMs = 8000,
+): Promise<{ lat: number; lng: number; label: string } | null> {
   const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`;
-  const res = await fetch(url, { headers: { Accept: 'application/json' } });
-  if (!res.ok) throw new Error(`Geocoding failed (${res.status})`);
-  const data = (await res.json()) as { lat: string; lon: string; display_name: string }[];
-  if (!data.length) return null;
-  return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon), label: data[0].display_name };
+  // The free service can be slow or stall; never let it block the UI indefinitely.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { headers: { Accept: 'application/json' }, signal: controller.signal });
+    if (!res.ok) throw new Error(`Geocoding failed (${res.status})`);
+    const data = (await res.json()) as { lat: string; lon: string; display_name: string }[];
+    if (!data.length) return null;
+    return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon), label: data[0].display_name };
+  } catch (err) {
+    if ((err as Error).name === 'AbortError') throw new Error('The address lookup took too long. Try again in a moment.');
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** Calls our serverless function (Vercel or Netlify), which holds the NREL key server-side. */

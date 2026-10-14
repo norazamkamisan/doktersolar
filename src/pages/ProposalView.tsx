@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { useProject, useSettings } from '../lib/store';
@@ -18,7 +18,6 @@ export default function ProposalView() {
   const { hash } = useLocation();
   const local = useProject(id);
   const localSettings = useSettings();
-  const docRef = useRef<HTMLElement>(null);
   const [shared, setShared] = useState<SharePayload | null>(null);
   const [loading, setLoading] = useState(() => !local && HAS_PAYLOAD.test(hash));
 
@@ -89,12 +88,11 @@ export default function ProposalView() {
         <ProposalActions
           project={project}
           settings={settings}
-          documentRef={docRef}
           shareUrl={local ? undefined : window.location.href}
         />
       </div>
       <div className="px-3 sm:px-4 print:px-0">
-        <ProposalDocument ref={docRef} project={project} settings={settings} />
+        <ProposalDocument project={project} settings={settings} />
       </div>
     </div>
   );
