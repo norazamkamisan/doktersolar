@@ -1,20 +1,46 @@
 import type { Project, PvWattsResult, Settings } from '../types';
 
-/** Free geocoding via OpenStreetMap Nominatim (max ~1 request/second). */
-export async function geocode(
-  address: string,
-  timeoutMs = 8000,
-): Promise<{ lat: number; lng: number; label: string } | null> {
-  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`;
-  // The free service can be slow or stall; never let it block the UI indefinitely.
+export interface GeocodeResult {
+  lat: number;
+  lng: number;
+  label: string;
+  /** true when only a shortened version of the address was found */
+  approximate: boolean;
+}
+
+/**
+ * Candidate queries: the full address, then with leading parts removed
+ * ("Lot G-03, Jalan X, Seremban" → "Jalan X, Seremban"). At least two parts are always kept,
+ * so a lone street name can't be matched to a different town.
+ */
+export function addressVariants(address: string): string[] {
+  const parts = address.split(',').map((p) => p.trim()).filter(Boolean);
+  const variants = [parts.join(', ')];
+  for (let i = 1; parts.length - i >= 2; i++) variants.push(parts.slice(i).join(', '));
+  return variants;
+}
+
+/**
+ * Free geocoding via OpenStreetMap Nominatim. Tries shorter versions of the address if the
+ * full one isn't found, at most one request per second (Nominatim's usage policy), and gives
+ * up after `timeoutMs` in total so a slow service can never block the UI.
+ */
+export async function geocode(address: string, timeoutMs = 8000): Promise<GeocodeResult | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { headers: { Accept: 'application/json' }, signal: controller.signal });
-    if (!res.ok) throw new Error(`Geocoding failed (${res.status})`);
-    const data = (await res.json()) as { lat: string; lon: string; display_name: string }[];
-    if (!data.length) return null;
-    return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon), label: data[0].display_name };
+    const variants = addressVariants(address);
+    for (let i = 0; i < variants.length; i++) {
+      if (i > 0) await new Promise((r) => setTimeout(r, 1100));
+      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(variants[i])}`;
+      const res = await fetch(url, { headers: { Accept: 'application/json' }, signal: controller.signal });
+      if (!res.ok) throw new Error(`Geocoding failed (${res.status})`);
+      const data = (await res.json()) as { lat: string; lon: string; display_name: string }[];
+      if (data.length) {
+        return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon), label: data[0].display_name, approximate: i > 0 };
+      }
+    }
+    return null;
   } catch (err) {
     if ((err as Error).name === 'AbortError') throw new Error('The address lookup took too long. Try again in a moment.');
     throw err;

@@ -32,6 +32,20 @@ interface Props {
   recenterKey?: number;
 }
 
+/**
+ * Proposal (static) maps: fit the view to the roof. react-leaflet ignores a `bounds` prop
+ * whenever `center` is also given, so this has to be done explicitly.
+ */
+function FitRoof({ roof }: { roof: LatLng[] }) {
+  const map = useMap();
+  const key = roof.map((p) => p.join(',')).join(';');
+  useEffect(() => {
+    if (roof.length >= 3) map.fitBounds(L.latLngBounds(roof), { padding: [30, 30], maxZoom: 20, animate: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, key]);
+  return null;
+}
+
 function Recenter({ center, roof, recenterKey }: { center: LatLng | null; roof: LatLng[]; recenterKey?: number }) {
   const map = useMap();
   useEffect(() => {
@@ -74,17 +88,21 @@ export default function SolarMap({
   onMoveVertex,
   recenterKey,
 }: Props) {
-  const start = center ?? DEFAULT_CENTER;
   const renderer = useMemo(() => L.canvas({ padding: 0.5 }), []);
-  const bounds = roof.length >= 3 ? L.latLngBounds(roof) : undefined;
+  // The roof is the most precise thing we know; prefer it over the geocoded address.
+  const roofCenter: LatLng | null = useMemo(() => {
+    if (roof.length < 3) return null;
+    const c = L.latLngBounds(roof).getCenter();
+    return [c.lat, c.lng];
+  }, [roof]);
+  const start = (staticView ? roofCenter ?? center : center ?? roofCenter) ?? DEFAULT_CENTER;
+  const located = !!(center || roofCenter);
 
   return (
     <div className={`${className} ${drawing ? 'drawing' : ''} relative overflow-hidden rounded-xl bg-slate-200`}>
       <MapContainer
         center={start}
-        zoom={center ? 20 : 12}
-        bounds={staticView ? bounds : undefined}
-        boundsOptions={{ padding: [30, 30] }}
+        zoom={located ? 20 : 12}
         maxZoom={21}
         className="h-full w-full"
         renderer={renderer}
@@ -97,6 +115,7 @@ export default function SolarMap({
         attributionControl
       >
         <TileLayer url={ESRI_URL} attribution={ESRI_ATTR} maxNativeZoom={19} maxZoom={21} />
+        {staticView && <FitRoof roof={roof} />}
         {!staticView && <Recenter center={center} roof={roof} recenterKey={recenterKey} />}
         {!staticView && <ClickHandler onClick={onMapClick} onDouble={onMapDoubleClick} />}
         <DoubleClickZoomToggle disabled={drawing || staticView} />
