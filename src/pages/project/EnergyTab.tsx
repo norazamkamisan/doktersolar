@@ -48,7 +48,11 @@ export default function EnergyTab({ project: p }: { project: Project }) {
       <div className="min-w-0 space-y-4">
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard label="Annual production" value={`${num(energy.annualKwh)} kWh`} hint={energy.source === 'pvwatts' ? 'PVWatts (NLR)' : 'Simple estimate'} />
-          <StatCard label="Bill offset" value={`${num(energy.offsetPct)}%`} hint={`of ~${num(energy.consumptionKwh)} kWh/yr usage`} />
+          <StatCard
+            label="Bill offset"
+            value={energy.consumptionKwh > 0 ? `${num(energy.offsetPct)}%` : '—'}
+            hint={energy.consumptionKwh > 0 ? `of ~${num(energy.consumptionKwh)} kWh/yr usage` : 'Add the monthly bill on the Info tab'}
+          />
           <StatCard label="Payback" value={fin.paybackYears ? `${num(fin.paybackYears, 1)} yrs` : '> 25 yrs'} hint={`System cost ${money(fin.systemCost, currency)}`} />
           <StatCard label="25-year savings" value={money(fin.savings25, currency)} hint={`Net ${money(fin.netSavings25, currency)}`} />
         </div>

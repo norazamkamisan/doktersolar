@@ -4,6 +4,7 @@ import { resetDemoData, updateSettings, useSettings } from '../lib/store';
 import { CURRENCIES } from '../lib/format';
 import { Field, NumberField, PageHeader } from '../components/ui';
 import { BrandLogo } from '../components/Logo';
+import OpenSolarImportCard from '../components/OpenSolarImportCard';
 
 /** Read an image file, downscale it to fit 400×160 and return a base64 data URL. */
 function fileToLogo(file: File): Promise<string> {
@@ -97,6 +98,8 @@ export default function SettingsPage() {
             <NumberField label="Peak sun hours" suffix="h/day" value={s.peakSunHours} min={0} step={0.1} onChange={(v) => updateSettings({ peakSunHours: v })} />
           </div>
         </section>
+
+        <OpenSolarImportCard />
 
         <section className="card flex flex-wrap items-center justify-between gap-4 p-5 sm:p-6">
           <div>

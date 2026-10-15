@@ -48,6 +48,7 @@ A solar design and proposal studio: sketch a roof on satellite imagery, auto-fil
 | **Proposal** (`/proposals/:id`) | Clean customer-facing page with map snapshot, key numbers, charts and assumptions. **Export to PDF** uses the browser print dialog with print CSS. **Share link** puts the proposal data in the URL so it opens on any device |
 | **Leads / Designs / Proposals** | Focused list views |
 | **Settings** | Company name, contact, logo upload (stored as base64), default panel wattage, price per watt, tariff, peak sun hours and currency. You can also reset to the demo data |
+| **Import from OpenSolar** (Settings) | Import an OpenSolar "Export projects" CSV in the browser, with nothing uploaded. Customer, address, map location, system size, price per watt and stage come across; roof type, phases, tariff, battery, dates and salesperson are kept in each project's notes. Re-importing updates projects instead of duplicating them, and **Remove imported** undoes it |
 
 Five sample projects in Malaysia are seeded on first load. Default currency is **MYR (RM)**; you can change it in Settings.
 

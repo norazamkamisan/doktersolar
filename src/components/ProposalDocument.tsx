@@ -83,9 +83,13 @@ const ProposalDocument = forwardRef<HTMLElement, { project: Project; settings: D
           {num(p.systemKw, 2)} kWp · {p.panelCount} panels
         </p>
         <p className="mt-2 text-sm text-brand-50">
-          Estimated to generate <strong>{num(energy.annualKwh)} kWh</strong> per year, covering about{' '}
-          <strong>{num(Math.min(energy.offsetPct, 999))}%</strong> of your electricity use and saving around{' '}
-          <strong>{money(fin.firstYearSavings, s.currency)}</strong> in the first year.
+          Estimated to generate <strong>{num(energy.annualKwh)} kWh</strong> per year,{' '}
+          {energy.consumptionKwh > 0 && (
+            <>
+              covering about <strong>{num(Math.min(energy.offsetPct, 999))}%</strong> of your electricity use and{' '}
+            </>
+          )}
+          saving around <strong>{money(fin.firstYearSavings, s.currency)}</strong> in the first year.
         </p>
       </section>
 
@@ -108,7 +112,7 @@ const ProposalDocument = forwardRef<HTMLElement, { project: Project; settings: D
         <Metric label="Year-1 savings" value={money(fin.firstYearSavings, s.currency)} />
         <Metric label="25-yr savings" value={money(fin.savings25, s.currency)} accent />
         <Metric label="Net 25-yr return" value={money(fin.netSavings25, s.currency)} />
-        <Metric label="Bill offset" value={`${num(energy.offsetPct)}%`} />
+        <Metric label="Bill offset" value={energy.consumptionKwh > 0 ? `${num(energy.offsetPct)}%` : '—'} />
       </section>
 
       {/* charts */}

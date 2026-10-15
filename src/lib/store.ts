@@ -129,6 +129,33 @@ export function updateSettings(patch: Partial<Settings>): void {
   emit();
 }
 
+/**
+ * Add or replace projects in bulk (e.g. an OpenSolar import). Projects with the same id are
+ * replaced, so importing the same file twice doesn't create duplicates. Saved all-or-nothing:
+ * if browser storage is full, nothing changes and an error is thrown.
+ */
+export function importProjects(incoming: Project[], options: { removeDemo?: boolean } = {}): { added: number; updated: number } {
+  const incomingIds = new Set(incoming.map((p) => p.id));
+  const kept = projects.filter((p) => !incomingIds.has(p.id) && !(options.removeDemo && p.id.startsWith('demo-')));
+  const updated = projects.filter((p) => incomingIds.has(p.id)).length;
+  const next = [...incoming, ...kept].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  try {
+    localStorage.setItem(PROJECTS_KEY, JSON.stringify(next));
+  } catch {
+    throw new Error('Not enough browser storage for this import. Remove some projects or the company logo and try again.');
+  }
+  projects = next;
+  emit();
+  return { added: incoming.length - updated, updated };
+}
+
+/** Remove every project whose id starts with `prefix` (e.g. undo an import). */
+export function removeProjectsWithPrefix(prefix: string): number {
+  const before = projects.length;
+  commitProjects(projects.filter((p) => !p.id.startsWith(prefix)));
+  return before - projects.length;
+}
+
 export function resetDemoData(): void {
   settings = { ...DEFAULT_SETTINGS };
   write(SETTINGS_KEY, settings);

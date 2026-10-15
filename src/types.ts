@@ -63,6 +63,8 @@ export interface Project {
   /** cached results so lists/dashboards don't need to recompute geometry */
   panelCount: number;
   systemKw: number;
+  /** system size brought in from another tool (e.g. OpenSolar); used until a roof is drawn */
+  importedKw?: number;
   proposalSentAt: string | null;
 }
 

@@ -7,6 +7,8 @@ import { kw } from '../lib/format';
 import { STATUS_DOT } from './ui';
 
 /** Kanban-style pipeline. Drag cards between columns (desktop) or use the arrow to advance. */
+const MAX_CARDS = 6;
+
 export default function Pipeline({ projects }: { projects: Project[] }) {
   const [over, setOver] = useState<ProjectStatus | null>(null);
 
@@ -15,7 +17,9 @@ export default function Pipeline({ projects }: { projects: Project[] }) {
   return (
     <div className="-mx-1 flex snap-x gap-3 overflow-x-auto px-1 pb-2">
       {STATUSES.map((status, idx) => {
-        const items = projects.filter((p) => p.status === status);
+        const all = projects.filter((p) => p.status === status);
+        // Big pipelines (e.g. after an OpenSolar import): show the most recent few, link to the rest.
+        const items = [...all].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, MAX_CARDS);
         const next = STATUSES[idx + 1];
         return (
           <div
@@ -39,7 +43,7 @@ export default function Pipeline({ projects }: { projects: Project[] }) {
               <span className={`h-2 w-2 rounded-full ${STATUS_DOT[status]}`} />
               <h3 className="text-sm font-semibold text-slate-700">{status}</h3>
               <span className="ml-auto rounded-full bg-white px-2 text-xs font-medium text-slate-500 ring-1 ring-slate-200">
-                {items.length}
+                {all.length.toLocaleString()}
               </span>
             </div>
             <div className="flex min-h-[64px] flex-col gap-2">
@@ -69,6 +73,14 @@ export default function Pipeline({ projects }: { projects: Project[] }) {
                   {p.systemKw > 0 && <p className="mt-1.5 text-xs font-medium text-slate-600 tabular-nums">{kw(p.systemKw)}</p>}
                 </div>
               ))}
+              {all.length > items.length && (
+                <Link
+                  to={`/projects?status=${encodeURIComponent(status)}`}
+                  className="rounded-lg px-3 py-2 text-center text-xs font-medium text-brand-700 hover:bg-white"
+                >
+                  + {(all.length - items.length).toLocaleString()} more
+                </Link>
+              )}
             </div>
           </div>
         );
