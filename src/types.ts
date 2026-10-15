@@ -1,3 +1,5 @@
+import type { TnbBill } from './lib/tnbBill';
+
 export type ProjectStatus = 'Lead' | 'Designing' | 'Proposal Sent' | 'Won' | 'Installed';
 
 export const STATUSES: ProjectStatus[] = ['Lead', 'Designing', 'Proposal Sent', 'Won', 'Installed'];
@@ -65,7 +67,23 @@ export interface Project {
   systemKw: number;
   /** system size brought in from another tool (e.g. OpenSolar); used until a roof is drawn */
   importedKw?: number;
+  /** average monthly use, kWh, when known from a scanned bill (otherwise estimated as monthlyBill ÷ tariff) */
+  monthlyKwh?: number;
+  /** the scanned TNB bill this project was created from */
+  bill?: ProjectBill;
   proposalSentAt: string | null;
+}
+
+export interface ProjectBill extends TnbBill {
+  scannedAt: string;
+  /** share of yearly use the system is sized to cover, % */
+  targetOffsetPct: number;
+}
+
+export interface ProjectBill extends TnbBill {
+  scannedAt: string;
+  /** share of yearly use the system is sized to cover, % */
+  targetOffsetPct: number;
 }
 
 export interface Settings {

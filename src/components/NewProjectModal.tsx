@@ -1,8 +1,11 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, X } from 'lucide-react';
+import { CheckCircle2, Loader2, X } from 'lucide-react';
 import { createProject, useSettings } from '../lib/store';
 import { geocode } from '../lib/api';
+import { NAME_HIDDEN, type BillCategory, type TnbBill } from '../lib/tnbBill';
+import { DEFAULT_TARGET_OFFSET, analyseBill, billProjectFields } from '../lib/billAnalysis';
+import { BillDetails, BillSizing, BillWarnings, ScanBillButton } from './BillScan';
 
 export default function NewProjectModal({ onClose }: { onClose: () => void }) {
   const settings = useSettings();
@@ -11,6 +14,31 @@ export default function NewProjectModal({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [bill, setBill] = useState<TnbBill | null>(null);
+  const [category, setCategory] = useState<BillCategory>('residential');
+  const [offset, setOffset] = useState(100);
+
+  const analysis = useMemo(
+    () =>
+      bill
+        ? analyseBill({ ...bill, category }, { peakSunHours: settings.peakSunHours, panelWattage: settings.defaultPanelWattage, targetOffsetPct: offset })
+        : null,
+    [bill, category, offset, settings.peakSunHours, settings.defaultPanelWattage],
+  );
+
+  const onScanned = (b: TnbBill) => {
+    setBill(b);
+    setCategory(b.category);
+    setOffset(DEFAULT_TARGET_OFFSET[b.category]);
+    setError('');
+    const avg = analyseBill(b, { peakSunHours: settings.peakSunHours, panelWattage: settings.defaultPanelWattage }).averageBillRm;
+    setForm((f) => ({
+      ...f,
+      customerName: b.customerName || f.customerName,
+      address: b.premiseAddress || b.postalAddress || f.address,
+      monthlyBill: String(Math.round(avg ?? b.currentCharge ?? 0) || f.monthlyBill),
+    }));
+  };
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [k]: e.target.value });
 
@@ -31,11 +59,14 @@ export default function NewProjectModal({ onClose }: { onClose: () => void }) {
     setNotice('Finding the address on the map…');
     let loc: { lat: number; lng: number } | null = null;
     try {
-      loc = await geocode(form.address, 6000);
+      // bills mask the house number as "XX", which only confuses the map search
+      loc = await geocode(form.address.replace(/^s*X+s*,s*/i, ''), 6000);
     } catch {
       /* geocoding is best-effort: the project is still saved, and can be located on the map later */
     }
+    const fromBill = bill && analysis ? billProjectFields({ ...bill, category }, analysis) : null;
     const p = createProject({
+      ...fromBill,
       customerName: form.customerName.trim(),
       email: form.email.trim(),
       phone: form.phone.trim(),
@@ -46,7 +77,7 @@ export default function NewProjectModal({ onClose }: { onClose: () => void }) {
     });
     setBusy(false);
     onClose();
-    navigate(`/projects/${p.id}/design`);
+    navigate(`/projects/${p.id}/${fromBill ? 'proposal' : 'design'}`);
   };
 
   return (
@@ -59,7 +90,7 @@ export default function NewProjectModal({ onClose }: { onClose: () => void }) {
         onSubmit={submit}
         noValidate
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl sm:rounded-2xl"
+        className={`flex max-h-[92dvh] w-full ${bill ? 'max-w-2xl' : 'max-w-lg'} flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl sm:rounded-2xl`}
         aria-labelledby="new-project-title"
       >
         <div className="overflow-y-auto p-6 pb-4">
@@ -74,6 +105,22 @@ export default function NewProjectModal({ onClose }: { onClose: () => void }) {
             <X className="h-5 w-5" />
           </button>
         </div>
+        <div className="mb-5">
+          {bill ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+              <span className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 shrink-0" />
+                <span>
+                  TNB bill read{bill.accountNo ? <> for account <strong>{bill.accountNo}</strong></> : null}. Check the details below.
+                </span>
+              </span>
+              <ScanBillButton onScanned={onScanned} variant="button" label="Scan another" />
+            </div>
+          ) : (
+            <ScanBillButton onScanned={onScanned} />
+          )}
+        </div>
+        {bill && <div className="mb-4"><BillWarnings warnings={bill.warnings.filter((w) => w !== NAME_HIDDEN || !form.customerName.trim())} /></div>}
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <label className="label" htmlFor="np-name">Customer name *</label>
@@ -114,6 +161,28 @@ export default function NewProjectModal({ onClose }: { onClose: () => void }) {
             />
           </div>
         </div>
+        {bill && analysis && (
+          <div className="mt-6 space-y-4 border-t border-slate-100 pt-5">
+            <h3 className="font-semibold text-slate-900">Recommended system</h3>
+            <BillSizing
+              analysis={analysis}
+              category={category}
+              onCategory={(c) => {
+                setCategory(c);
+                setOffset(DEFAULT_TARGET_OFFSET[c]);
+              }}
+              onOffset={setOffset}
+              panelWattage={settings.defaultPanelWattage}
+              idPrefix="np"
+            />
+            <details className="rounded-xl border border-slate-200 p-3">
+              <summary className="cursor-pointer text-sm font-medium text-slate-700">All details read from the bill</summary>
+              <div className="mt-3">
+                <BillDetails bill={{ ...bill, category }} />
+              </div>
+            </details>
+          </div>
+        )}
         </div>
         <div className="border-t border-slate-100 bg-white px-6 py-4">
           {error && (
@@ -132,7 +201,7 @@ export default function NewProjectModal({ onClose }: { onClose: () => void }) {
             </button>
             <button type="submit" className="btn-primary" disabled={busy}>
               {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-              {busy ? 'Saving…' : 'Create project'}
+              {busy ? 'Saving…' : bill ? 'Create project & proposal' : 'Create project'}
             </button>
           </div>
         </div>

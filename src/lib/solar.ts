@@ -1,4 +1,4 @@
-import type { DesignSettings, EnergySettings, LatLng, Project } from '../types';
+import type { DesignSettings, LatLng, Project } from '../types';
 
 /* ------------------------------------------------------------------ */
 /* Geometry                                                            */
@@ -199,7 +199,7 @@ export function energyFor(p: Project): EnergyResult {
   const usePv = e.usePvWatts && !!e.pvwatts;
   const annualKwh = usePv ? e.pvwatts!.annual : simpleAnnualKwh(p.systemKw, e.peakSunHours);
   const monthlyKwh = usePv ? e.pvwatts!.monthly : monthlySplit(annualKwh, p.lat);
-  const consumptionKwh = e.tariff > 0 ? (p.monthlyBill * 12) / e.tariff : 0;
+  const consumptionKwh = annualUsageKwh(p);
   return {
     annualKwh,
     monthlyKwh,
@@ -209,10 +209,17 @@ export function energyFor(p: Project): EnergyResult {
   };
 }
 
-/** System size needed to cover the customer's bill with the simple model. */
-export function recommendedKw(monthlyBill: number, e: Pick<EnergySettings, 'tariff' | 'peakSunHours'>): number {
-  if (e.tariff <= 0 || e.peakSunHours <= 0) return 0;
-  return (monthlyBill * 12) / e.tariff / (e.peakSunHours * 365 * PERFORMANCE_RATIO);
+/** Yearly electricity use: from the scanned bill when there is one, else estimated from the monthly bill. */
+export function annualUsageKwh(p: Pick<Project, 'monthlyBill' | 'monthlyKwh' | 'energy'>): number {
+  if (p.monthlyKwh && p.monthlyKwh > 0) return p.monthlyKwh * 12;
+  return p.energy.tariff > 0 ? (p.monthlyBill * 12) / p.energy.tariff : 0;
+}
+
+/** System size needed to cover the customer's use (or the bill's target share of it) with the simple model. */
+export function recommendedKw(p: Pick<Project, 'monthlyBill' | 'monthlyKwh' | 'energy' | 'bill'>): number {
+  if (p.energy.peakSunHours <= 0) return 0;
+  const share = (p.bill?.targetOffsetPct ?? 100) / 100;
+  return (annualUsageKwh(p) * share) / (p.energy.peakSunHours * 365 * PERFORMANCE_RATIO);
 }
 
 export interface Financials {

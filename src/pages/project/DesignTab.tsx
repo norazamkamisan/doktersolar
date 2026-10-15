@@ -82,7 +82,7 @@ export default function DesignTab({ project: p }: { project: Project }) {
 
   const layout = useMemo(() => layoutPanels(d), [d]);
   const sizeKw = systemKw(layout.panels.length, d.panelWattage);
-  const recommended = recommendedKw(p.monthlyBill, p.energy);
+  const recommended = recommendedKw(p);
   const center: LatLng | null = p.lat != null && p.lng != null ? [p.lat, p.lng] : null;
 
   const search = async (e: FormEvent) => {
@@ -137,8 +137,8 @@ export default function DesignTab({ project: p }: { project: Project }) {
         {searchInfo && <p className="text-xs text-amber-700">{searchInfo}</p>}
         {!!p.importedKw && d.roof.length < 3 && !drawing && (
           <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-800" role="note">
-            Imported from OpenSolar as a <strong>{num(p.importedKw, 2)} kWp</strong> system. Draw the roof to lay out panels here;
-            the drawn layout then replaces the imported size.
+            {p.bill ? 'Sized from the TNB bill' : 'Imported from OpenSolar'} as a <strong>{num(p.importedKw, 2)} kWp</strong> system.
+            Draw the roof to lay out panels here; the drawn layout then replaces {p.bill ? 'the recommended' : 'the imported'} size.
           </div>
         )}
         {!center && !drawing && (

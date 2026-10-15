@@ -10,3 +10,6 @@ dist
 
 # Customer data exports (e.g. OpenSolar CSV): never commit
 *.csv
+
+# Customer bills / documents: never commit
+*.pdf
