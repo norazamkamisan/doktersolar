@@ -6,6 +6,72 @@ import { geocode } from '../../lib/api';
 import { date, money, num } from '../../lib/format';
 import { energyFor, recommendedKw } from '../../lib/solar';
 import { Field } from '../../components/ui';
+import { NAME_HIDDEN, type BillCategory, type TnbBill } from '../../lib/tnbBill';
+import { DEFAULT_TARGET_OFFSET, analyseBill, billProjectFields } from '../../lib/billAnalysis';
+import { BillDetails, BillSizing, BillWarnings, ScanBillButton } from '../../components/BillScan';
+
+/** Scan a bill onto this project, or adjust how the system is sized from it. */
+function BillCard({ project: p }: { project: Project }) {
+  const apply = (bill: TnbBill, category: BillCategory, offset: number) => {
+    const b = { ...bill, category };
+    const a = analyseBill(b, { peakSunHours: p.energy.peakSunHours, panelWattage: p.design.panelWattage, targetOffsetPct: offset });
+    const f = billProjectFields(b, a);
+    updateProject(p.id, (prev) => ({
+      bill: f.bill,
+      monthlyKwh: f.monthlyKwh,
+      monthlyBill: f.monthlyBill,
+      importedKw: f.importedKw,
+      energy: { ...prev.energy, ...f.energy },
+      customerName: prev.customerName || b.customerName,
+      address: prev.address || b.premiseAddress,
+      design: prev.design, // recompute the system size
+    }));
+  };
+
+  if (!p.bill) {
+    return (
+      <section className="card p-5 lg:col-span-3">
+        <h2 className="mb-1 font-semibold text-slate-900">Electricity bill</h2>
+        <p className="mb-4 text-sm text-slate-500">Scan the customer's TNB bill to use their real usage and tariff in the proposal.</p>
+        <ScanBillButton onScanned={(b) => apply(b, b.category, DEFAULT_TARGET_OFFSET[b.category])} />
+      </section>
+    );
+  }
+
+  const bill = p.bill;
+  const analysis = analyseBill(bill, { peakSunHours: p.energy.peakSunHours, panelWattage: p.design.panelWattage, targetOffsetPct: bill.targetOffsetPct });
+  return (
+    <section className="card p-5 lg:col-span-3">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="font-semibold text-slate-900">Electricity bill</h2>
+          <p className="text-sm text-slate-500">
+            TNB {bill.accountNo && <>account {bill.accountNo}, </>}
+            {bill.billDate ? <>bill dated {date(bill.billDate)}</> : 'bill'}, scanned {date(bill.scannedAt)}
+          </p>
+        </div>
+        <ScanBillButton onScanned={(b) => apply(b, b.category, DEFAULT_TARGET_OFFSET[b.category])} variant="button" label="Scan a newer bill" />
+      </div>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="space-y-4">
+          <BillWarnings warnings={bill.warnings.filter((w) => w !== NAME_HIDDEN || !p.customerName.trim())} />
+          <BillSizing
+            analysis={analysis}
+            category={bill.category}
+            onCategory={(c) => apply(bill, c, DEFAULT_TARGET_OFFSET[c])}
+            onOffset={(pct) => apply(bill, bill.category, pct)}
+            panelWattage={p.design.panelWattage}
+            idPrefix="info-bill"
+          />
+          {p.design.roof.length >= 3 && (
+            <p className="text-xs text-slate-500">The drawn roof layout sets the system size; the recommendation above is for comparison.</p>
+          )}
+        </div>
+        <BillDetails bill={bill} />
+      </div>
+    </section>
+  );
+}
 
 export default function InfoTab({ project: p }: { project: Project }) {
   const settings = useSettings();
@@ -71,9 +137,9 @@ export default function InfoTab({ project: p }: { project: Project }) {
             ['Created', date(p.createdAt)],
             ['Last updated', date(p.updatedAt)],
             ['Coordinates', p.lat != null && p.lng != null ? `${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}` : 'Not located'],
-            ['Est. annual usage', `${num(energy.consumptionKwh)} kWh`],
+            [p.monthlyKwh ? 'Annual usage (bill)' : 'Est. annual usage', `${num(energy.consumptionKwh)} kWh`],
             ['Annual bill', money(p.monthlyBill * 12, settings.currency)],
-            ['Recommended size', `${num(recommendedKw(p.monthlyBill, p.energy), 2)} kWp`],
+            ['Recommended size', `${num(recommendedKw(p), 2)} kWp`],
             ['Designed size', p.systemKw > 0 ? `${num(p.systemKw, 2)} kWp (${p.panelCount} panels)` : '—'],
             ['Bill offset', p.systemKw > 0 && energy.consumptionKwh > 0 ? `${num(energy.offsetPct)}%` : '—'],
             ['Proposal sent', date(p.proposalSentAt)],
@@ -85,6 +151,8 @@ export default function InfoTab({ project: p }: { project: Project }) {
           ))}
         </dl>
       </section>
+
+      <BillCard project={p} />
     </div>
   );
 }

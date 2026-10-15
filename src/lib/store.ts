@@ -77,23 +77,26 @@ export function newId(): string {
 export type NewProjectInput = Pick<Project, 'customerName' | 'email' | 'phone' | 'address' | 'monthlyBill'> & {
   lat: number | null;
   lng: number | null;
-};
+} & Partial<Pick<Project, 'notes' | 'monthlyKwh' | 'importedKw' | 'bill'>> & {
+    /** overrides for the default energy settings (e.g. the tariff from a scanned bill) */
+    energy?: Partial<EnergySettings>;
+  };
 
-export function createProject(input: NewProjectInput): Project {
+export function createProject({ energy, ...input }: NewProjectInput): Project {
   const now = new Date().toISOString();
-  const p: Project = {
+  const p: Project = withComputed({
     id: newId(),
-    ...input,
     status: 'Lead',
     notes: '',
+    ...input,
     createdAt: now,
     updatedAt: now,
     design: defaultDesign(settings),
-    energy: defaultEnergy(settings),
+    energy: { ...defaultEnergy(settings), ...energy },
     panelCount: 0,
     systemKw: 0,
     proposalSentAt: null,
-  };
+  });
   commitProjects([p, ...projects]);
   return p;
 }

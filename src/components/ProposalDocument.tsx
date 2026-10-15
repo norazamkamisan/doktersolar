@@ -5,6 +5,7 @@ import { date, money, num } from '../lib/format';
 import SolarMap from './SolarMap';
 import { LogoMark } from './Logo';
 import { CashflowChart, MonthlyProductionChart } from './Charts';
+import { CATEGORY_LABEL } from '../lib/billAnalysis';
 
 export type DocSettings = Omit<Settings, 'logo'> & { logo?: string | null };
 
@@ -14,6 +15,73 @@ function Metric({ label, value, accent = false }: { label: string; value: string
       <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
       <p className={`mt-1 text-xl font-semibold tabular-nums ${accent ? 'text-brand-600' : 'text-slate-900'}`}>{value}</p>
     </div>
+  );
+}
+
+/** The customer's current TNB bill, and what it could look like with solar. */
+function BillSection({ project: p, currency, monthlySaving, wide }: { project: Project; currency: string; monthlySaving: number; wide: boolean }) {
+  const b = p.bill!;
+  const history = b.history.filter((h) => h.kwh !== null);
+  const maxKwh = Math.max(1, ...history.map((h) => h.kwh!));
+  // the fixed retail charge stays on the bill even when solar covers all the energy
+  const after = Math.max(b.charges.retailRm ?? 0, p.monthlyBill - monthlySaving);
+  return (
+    <section className="avoid-break mt-6">
+      <h2 className="mb-3 text-lg font-semibold text-slate-900">Your electricity today</h2>
+      <div className={`grid gap-4 ${wide ? 'grid-cols-2' : 'md:grid-cols-2'}`}>
+        <div className="overflow-hidden rounded-xl border border-slate-200">
+          <table className="w-full text-sm">
+            <tbody className="divide-y divide-slate-100">
+              {[
+                ['TNB account', b.accountNo],
+                ['Tariff', b.tariff ? `${b.tariff} (${CATEGORY_LABEL[b.category].toLowerCase()})` : CATEGORY_LABEL[b.category]],
+                ['Average use', p.monthlyKwh ? `${num(p.monthlyKwh)} kWh per month` : null],
+                ['Average bill', p.monthlyBill > 0 ? `${money(p.monthlyBill, currency)} per month` : null],
+                ['Rate you pay', `${money(p.energy.tariff, currency, 3)} per kWh`],
+                ['Maximum demand', b.maxDemandKw !== null ? `${num(b.maxDemandKw, 1)} kW` : null],
+                ['Existing solar', b.nem ? 'Yes, on NEM (bill shows grid use only)' : null],
+              ]
+                .filter(([, v]) => v)
+                .map(([k, v]) => (
+                  <tr key={k}>
+                    <td className="w-2/5 bg-slate-50 px-4 py-2 font-medium text-slate-600">{k}</td>
+                    <td className="px-4 py-2 text-slate-800">{v}</td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="flex flex-col gap-4">
+          {history.length > 1 && (
+            <div className="rounded-xl bg-slate-50 p-4">
+              <p className="mb-3 text-xs font-medium uppercase tracking-wide text-slate-500">Recent use (kWh)</p>
+              <div className="flex h-24 items-end gap-2">
+                {history.map((h) => (
+                  <div key={h.month} className="flex flex-1 flex-col items-center gap-1">
+                    <span className="text-[10px] tabular-nums text-slate-500">{num(h.kwh!)}</span>
+                    <div className="w-full rounded-t bg-brand-400" style={{ height: `${Math.max(4, (h.kwh! / maxKwh) * 64)}px` }} />
+                    <span className="text-[10px] text-slate-500">{h.month.split(' ')[0]}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {p.systemKw > 0 && p.monthlyBill > 0 && !b.nem && (
+            <div className="grid grid-cols-2 gap-3">
+              <Metric label="Bill today" value={`${money(p.monthlyBill, currency)}/mo`} />
+              <Metric label="With solar, about" value={`${money(after, currency)}/mo`} accent />
+            </div>
+          )}
+        </div>
+      </div>
+      {b.nem && (
+        <p className="mt-3 text-xs leading-relaxed text-slate-500">
+          You already have solar under NEM, so your bill shows only the power bought from TNB after your existing panels. The
+          savings below assume the new system replaces that grid power at your current rate; credits for power exported beyond
+          your own use are limited under NEM, so we will confirm the final size at the site survey.
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -92,6 +160,8 @@ const ProposalDocument = forwardRef<HTMLElement, { project: Project; settings: D
           saving around <strong>{money(fin.firstYearSavings, s.currency)}</strong> in the first year.
         </p>
       </section>
+
+      {p.bill && <BillSection project={p} currency={s.currency} monthlySaving={fin.firstYearSavings / 12} wide={forExport} />}
 
       {/* map */}
       <section className="avoid-break mt-6">

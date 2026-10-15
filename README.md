@@ -48,6 +48,7 @@ A solar design and proposal studio: sketch a roof on satellite imagery, auto-fil
 | **Proposal** (`/proposals/:id`) | Clean customer-facing page with map snapshot, key numbers, charts and assumptions. **Export to PDF** uses the browser print dialog with print CSS. **Share link** puts the proposal data in the URL so it opens on any device |
 | **Leads / Designs / Proposals** | Focused list views |
 | **Settings** | Company name, contact, logo upload (stored as base64), default panel wattage, price per watt, tariff, peak sun hours and currency. You can also reset to the demo data |
+| **Scan a TNB bill** (New Project, Info tab) | Choose a TNB bill PDF (residential, commercial or factory) and it's read in the browser, with nothing uploaded. Account, tariff, addresses, billing period, kWh used, every charge line, meter readings, maximum demand, NEM details and the past months' usage come across. The app works out the average use and the rate actually paid, then sizes a system (100% of use for homes, 80% for shops, 70% for factories, editable; shops and factories are capped at the bill's maximum demand) and opens a ready proposal with a "Your electricity today" section |
 | **Import from OpenSolar** (Settings) | Import an OpenSolar "Export projects" CSV in the browser, with nothing uploaded. Customer, address, map location, system size, price per watt and stage come across; roof type, phases, tariff, battery, dates and salesperson are kept in each project's notes. Re-importing updates projects instead of duplicating them, and **Remove imported** undoes it |
 
 Five sample projects in Malaysia are seeded on first load. Default currency is **MYR (RM)**; you can change it in Settings.
@@ -77,6 +78,8 @@ doktersolar/
 │  │  ├─ defaults.ts   # default settings / design / energy
 │  │  ├─ seed.ts       # 5 demo projects
 │  │  ├─ api.ts        # Nominatim geocoding, PVWatts client, share-link encoding
+│  │  ├─ tnbBill.ts    # TNB bill PDF parser (pdfText.ts reads the PDF with pdf.js)
+│  │  ├─ billAnalysis.ts # average use, rate paid and system sizing from a bill
 │  │  └─ format.ts     # currency / number / date helpers
 │  ├─ components/      # Layout, SolarMap, Charts, Pipeline, ProposalDocument, ui…
 │  └─ pages/           # Home, Projects, ProjectDetail (+ project/ tabs), Leads, Designs, Proposals, ProposalView, Settings
@@ -207,6 +210,7 @@ Vercel's own "Password Protection" is a paid Pro feature. This middleware does t
 - **Panel fill:** the roof is rotated so rows run perpendicular to the azimuth. A grid of panel footprints is tested: all four corners must sit inside the roof, at least the setback distance from every edge, and no roof vertex may poke into a panel. The plan-view length of a panel shrinks by cos(tilt). Sixteen grid offsets are tried and the one that fits the most panels wins.
 - **Production (simple):** `kWp × peak sun hours × 365 × 0.8`, split across months by day count with a mild seasonal curve that grows with latitude.
 - **Production (PVWatts):** PVWatts v8 from NLR (formerly NREL), fixed roof mount, 14% losses. The function tries the `nsrdb` dataset first and falls back to `intl`.
+- **From a TNB bill:** average monthly use is the average printed on the bill, else the past months' average, else this bill. Rate paid = (usage charge − retail charge + service tax + KWTBB) ÷ kWh. Recommended kWp = yearly use × target share ÷ (peak sun hours × 365 × 0.8), rounded up to whole panels.
 - **Savings:** year-*n* savings = production × (1 − degradation)^(n−1) × tariff × (1 + escalation)^(n−1). Payback is the interpolated year where cumulative savings exceed the system cost (`kWp × 1000 × price per watt`).
 
 These are indicative estimates for a portfolio demo, not engineering-grade simulations. They don't model shading, inverter clipping, export tariffs or net metering.
