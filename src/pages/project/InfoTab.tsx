@@ -75,7 +75,7 @@ export default function InfoTab({ project: p }: { project: Project }) {
             ['Annual bill', money(p.monthlyBill * 12, settings.currency)],
             ['Recommended size', `${num(recommendedKw(p.monthlyBill, p.energy), 2)} kWp`],
             ['Designed size', p.systemKw > 0 ? `${num(p.systemKw, 2)} kWp (${p.panelCount} panels)` : '—'],
-            ['Bill offset', p.systemKw > 0 ? `${num(energy.offsetPct)}%` : '—'],
+            ['Bill offset', p.systemKw > 0 && energy.consumptionKwh > 0 ? `${num(energy.offsetPct)}%` : '—'],
             ['Proposal sent', date(p.proposalSentAt)],
           ].map(([k, v]) => (
             <div key={k} className="flex justify-between gap-4">

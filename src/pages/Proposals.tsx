@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ExternalLink } from 'lucide-react';
 import { useProjects, useSettings } from '../lib/store';
@@ -9,6 +9,7 @@ import { Empty, PageHeader, StatusBadge } from '../components/ui';
 export default function Proposals() {
   const projects = useProjects();
   const { currency } = useSettings();
+  const [shown, setShown] = useState(50);
   const rows = useMemo(
     () =>
       projects
@@ -28,7 +29,7 @@ export default function Proposals() {
         <>
         {/* phones: stacked cards */}
         <ul className="card divide-y divide-slate-100 md:hidden">
-          {rows.map(({ p, f }) => (
+          {rows.slice(0, shown).map(({ p, f }) => (
             <li key={p.id} className="p-4">
               <div className="flex items-start justify-between gap-2">
                 <Link to={`/projects/${p.id}/proposal`} className="font-medium text-slate-900 hover:text-brand-600">
@@ -72,7 +73,7 @@ export default function Proposals() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {rows.map(({ p, f }) => (
+              {rows.slice(0, shown).map(({ p, f }) => (
                 <tr key={p.id} className="hover:bg-slate-50">
                   <td className="td">
                     <Link to={`/projects/${p.id}/proposal`} className="font-medium text-slate-900 hover:text-brand-600">
@@ -95,6 +96,16 @@ export default function Proposals() {
               ))}
             </tbody>
           </table>
+        </div>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-500">
+          <span>
+            Showing {Math.min(shown, rows.length).toLocaleString()} of {rows.length.toLocaleString()}
+          </span>
+          {shown < rows.length && (
+            <button className="btn-secondary" onClick={() => setShown((n) => n + 50)}>
+              Show more
+            </button>
+          )}
         </div>
         </>
       ) : (

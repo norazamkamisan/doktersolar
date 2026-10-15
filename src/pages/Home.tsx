@@ -39,12 +39,12 @@ export default function Home() {
       <PageHeader title="Dashboard" subtitle={`Hi ${settings.userName || 'there'} — here's how your solar pipeline is looking.`} />
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <StatCard label="Active projects" value={stats.active} hint={`${projects.length} total`} icon={<FolderKanban className="h-4 w-4" />} />
+        <StatCard label="Active projects" value={num(stats.active)} hint={`${num(projects.length)} total`} icon={<FolderKanban className="h-4 w-4" />} />
         <StatCard label="Total designed" value={`${num(stats.totalKw, 1)} kWp`} hint="Across all projects" icon={<Zap className="h-4 w-4" />} />
-        <StatCard label="Proposals sent" value={stats.sent} icon={<Send className="h-4 w-4" />} />
+        <StatCard label="Proposals sent" value={num(stats.sent)} icon={<Send className="h-4 w-4" />} />
         <StatCard
           label="Proposals accepted"
-          value={stats.accepted}
+          value={num(stats.accepted)}
           hint={stats.sent ? `${Math.round((stats.accepted / stats.sent) * 100)}% win rate` : undefined}
           icon={<CheckCircle2 className="h-4 w-4" />}
         />

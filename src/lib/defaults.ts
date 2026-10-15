@@ -43,6 +43,10 @@ export function defaultEnergy(s: Settings): EnergySettings {
 
 /** Recompute cached panel count & size from the design geometry. */
 export function withComputed(p: Project): Project {
+  // Imported projects keep their original size until a roof is drawn.
+  if (p.design.roof.length < 3 && p.importedKw && p.importedKw > 0) {
+    return { ...p, systemKw: p.importedKw, panelCount: Math.round((p.importedKw * 1000) / p.design.panelWattage) };
+  }
   const { panels } = layoutPanels(p.design);
   return { ...p, panelCount: panels.length, systemKw: systemKw(panels.length, p.design.panelWattage) };
 }
