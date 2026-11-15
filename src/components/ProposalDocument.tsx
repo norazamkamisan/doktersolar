@@ -22,6 +22,7 @@ import { money, num } from '../lib/format';
 import { fillTerms, inverterLine, issuedAt, longDate, panelLine, paragraphs, quoteFor, quoteNumber, shortName, validUntil } from '../lib/proposal';
 import { CATEGORY_LABEL } from '../lib/billAnalysis';
 import SolarMap from './SolarMap';
+import environmentPhoto from '../assets/environment.jpg';
 import { LogoMark } from './Logo';
 import { AnnualSavingsChart, BillCompareChart, CumulativeBillSavingsChart, CumulativeNetChart, DailyGenUseChart, GREEN } from './ProposalCharts';
 
@@ -335,13 +336,7 @@ const ProposalDocument = forwardRef<HTMLElement, { project: Project; settings: D
           <span className="mt-8 block">Environmental Benefits</span>
         </H2>
         <p className="-mt-3 text-center text-xs text-slate-700">Solar has no emissions. It just silently generates pure, clean energy.</p>
-        <div className="mt-4 h-28 w-full" style={{ background: 'linear-gradient(120deg,#2e7d32 0%,#66bb6a 45%,#c5e1a5 100%)' }} aria-hidden="true">
-          <div className="flex h-full items-center justify-center gap-10 text-white/90">
-            <TreeDeciduous className="h-14 w-14" />
-            <TreeDeciduous className="h-20 w-20" />
-            <TreeDeciduous className="h-14 w-14" />
-          </div>
-        </div>
+        <img src={environmentPhoto} alt="" className="mt-4 h-28 w-full object-cover" />
         <div className={`mt-5 grid gap-4 ${r('sm:grid-cols-[2fr_3fr]', 'grid-cols-[2fr_3fr]')}`}>
           <div className="border border-slate-200 p-3">
             <p className="mb-2 text-center text-xs text-slate-700">Each Year</p>
