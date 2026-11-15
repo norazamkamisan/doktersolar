@@ -54,10 +54,11 @@ function H2({ children }: { children: ReactNode }) {
   return <h2 className="mb-5 text-center text-2xl font-light tracking-tight text-slate-800">{children}</h2>;
 }
 
-function BigStat({ value, unit, label, green = false }: { value: string; unit?: string; label: string; green?: boolean }) {
+/** A headline number with its label; `size` sets the number's text size. */
+function BigStat({ value, unit, label, green = false, size = 'text-2xl' }: { value: string; unit?: string; label: string; green?: boolean; size?: string }) {
   return (
-    <div className="px-2 text-center">
-      <p className={`text-2xl font-light tabular-nums ${green ? '' : 'text-slate-900'}`} style={green ? { color: GREEN } : undefined}>
+    <div className="min-w-0 px-1 text-center">
+      <p className={`${size} font-light tabular-nums ${green ? '' : 'text-slate-900'}`} style={green ? { color: GREEN } : undefined}>
         {value}
         {unit && <span className="ml-0.5 text-xs">{unit}</span>}
       </p>
@@ -141,6 +142,8 @@ const ProposalDocument = forwardRef<HTMLElement, { project: Project; settings: D
   // share links made before newer settings existed don't carry them
   const s = { ...DEFAULT_SETTINGS, ...docSettings } as Settings;
   const r = (screen: string, exported: string) => (forExport ? exported : screen);
+  // three numbers across: smaller on phones so e.g. "241,752 km" doesn't run into the next one
+  const lifetimeSize = r('text-lg sm:text-2xl', 'text-2xl');
   const contentW = PAGE_W - PAD_X * 2;
 
   const layout = useMemo(() => layoutPanels(p.design), [p.design]);
@@ -350,15 +353,15 @@ const ProposalDocument = forwardRef<HTMLElement, { project: Project; settings: D
             <div className="grid grid-cols-3">
               <div className="text-center">
                 <Car className="mx-auto mb-1 h-4 w-4 text-slate-400" />
-                <BigStat value={num(env.carKm)} unit="km" label="Car distance avoided" />
+                <BigStat value={num(env.carKm)} unit="km" label="Car distance avoided" size={lifetimeSize} />
               </div>
               <div className="text-center">
                 <TreeDeciduous className="mx-auto mb-1 h-4 w-4 text-slate-400" />
-                <BigStat value={num(env.trees)} label="Trees planted" />
+                <BigStat value={num(env.trees)} label="Trees planted" size={lifetimeSize} />
               </div>
               <div className="text-center">
                 <Plane className="mx-auto mb-1 h-4 w-4 text-slate-400" />
-                <BigStat value={num(env.flights)} label="Long haul flights avoided" />
+                <BigStat value={num(env.flights)} label="Long haul flights avoided" size={lifetimeSize} />
               </div>
             </div>
           </div>
