@@ -5,7 +5,8 @@ import { BrandLogo } from './Logo';
 import NewProjectModal from './NewProjectModal';
 import SyncStatus from './SyncStatus';
 import InstallApp from './InstallApp';
-import { useSettings } from '../lib/store';
+import { useMe } from '../lib/sync';
+import { useCurrentName } from './Salespeople';
 import { initials } from '../lib/format';
 
 const NAV = [
@@ -21,7 +22,8 @@ export default function Layout() {
   const [navOpen, setNavOpen] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
   const [q, setQ] = useState('');
-  const settings = useSettings();
+  const me = useMe();
+  const name = useCurrentName();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -37,7 +39,7 @@ export default function Layout() {
       <div className="mb-4 px-2 pt-1">
         <BrandLogo />
       </div>
-      {NAV.map(({ to, label, icon: Icon }) => (
+      {NAV.filter((n) => me.role === 'admin' || n.to !== '/settings').map(({ to, label, icon: Icon }) => (
         <NavLink
           key={to}
           to={to}
@@ -107,9 +109,9 @@ export default function Layout() {
             </button>
             <div
               className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-800 text-xs font-semibold text-white"
-              title={settings.userName}
+              title={`Signed in as ${name}${me.role === 'admin' ? ' (admin)' : ''}`}
             >
-              {initials(settings.userName) || 'DS'}
+              {initials(name) || 'DS'}
             </div>
           </div>
         </header>

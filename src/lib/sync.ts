@@ -20,8 +20,15 @@ export interface SyncStatus {
   pendingCount: number;
 }
 
+/** Who is signed in: the admin (site password) or a salesperson (their own login). */
+export interface Me {
+  role: 'admin' | 'sales';
+  salespersonId: string | null;
+}
+
 interface ServerData {
   configured: boolean;
+  me?: Me;
   error?: string;
   savedAt?: string | null;
   settings?: Settings | null;
@@ -49,13 +56,15 @@ interface Pending {
   settings: boolean;
   /** this device has merged with the shared copy at least once */
   synced: boolean;
+  /** who the local copy belongs to ("admin" or "sales:<id>"); another user's data is cleared on sign-in */
+  owner?: string;
 }
 
 function loadPending(): Pending {
   try {
     const raw = JSON.parse(localStorage.getItem(PENDING_KEY) ?? 'null');
     if (raw && Array.isArray(raw.upsert) && Array.isArray(raw.remove)) {
-      return { upsert: raw.upsert, remove: raw.remove, settings: !!raw.settings, synced: !!raw.synced };
+      return { upsert: raw.upsert, remove: raw.remove, settings: !!raw.settings, synced: !!raw.synced, owner: raw.owner };
     }
   } catch {
     /* start fresh */
@@ -67,17 +76,19 @@ const upsert = new Set<string>();
 const remove = new Set<string>();
 let settingsPending = false;
 let synced = false;
+let owner: string | undefined;
 {
   const p = loadPending();
   p.upsert.forEach((id) => upsert.add(id));
   p.remove.forEach((id) => remove.add(id));
   settingsPending = p.settings;
   synced = p.synced;
+  owner = p.owner;
 }
 
 function savePending() {
   try {
-    localStorage.setItem(PENDING_KEY, JSON.stringify({ upsert: [...upsert], remove: [...remove], settings: settingsPending, synced }));
+    localStorage.setItem(PENDING_KEY, JSON.stringify({ upsert: [...upsert], remove: [...remove], settings: settingsPending, synced, owner }));
   } catch {
     /* storage full: the in-memory list still works for this session */
   }
@@ -101,6 +112,20 @@ function setStatus(patch: Partial<SyncStatus>) {
   status = { ...status, ...patch, pendingCount: upsert.size + remove.size + (settingsPending ? 1 : 0) };
   listeners.forEach((l) => l());
 }
+
+let me: Me = { role: 'admin', salespersonId: null };
+
+/** Who is signed in (the admin until the server says otherwise, e.g. in local development). */
+export function useMe(): Me {
+  return useSyncExternalStore(
+    (l) => {
+      listeners.add(l);
+      return () => listeners.delete(l);
+    },
+    () => me,
+  );
+}
+export const currentMe = () => me;
 
 export function useSyncStatus(): SyncStatus {
   return useSyncExternalStore(
@@ -133,6 +158,7 @@ export function noteProjectChanges(changed: string[], removed: string[]) {
 }
 
 export function noteSettingsChange() {
+  if (me.role === 'sales') return; // settings are the admin's; the server ignores them from salespeople
   settingsPending = true;
   settingsVersion++;
   savePending();
@@ -176,9 +202,29 @@ export async function pull(force = false): Promise<void> {
     if (data.error) throw new Error(data.error);
     configured = true;
 
+    // Who is signed in. If this device last held someone else's data (e.g. a shared laptop), start
+    // from the server's copy instead of merging, so nobody sees or uploads another user's projects.
+    let fresh = false;
+    if (data.me) {
+      const changedUser = data.me.role !== me.role || data.me.salespersonId !== me.salespersonId;
+      me = data.me;
+      const key = me.role === 'admin' ? 'admin' : `sales:${me.salespersonId}`;
+      if (owner !== key) {
+        if (owner || me.role === 'sales') {
+          upsert.clear();
+          remove.clear();
+          settingsPending = false;
+          synced = false;
+          fresh = true;
+        }
+        owner = key;
+      }
+      if (changedUser) setStatus({});
+    }
+
     const server = data.projects ?? [];
     const deleted = data.deleted ?? {};
-    const local = host.getProjects();
+    const local = fresh ? [] : host.getProjects();
     const localById = new Map(local.map((p) => [p.id, p]));
     const byId = new Map(server.map((p) => [p.id, p]));
 
@@ -187,14 +233,16 @@ export async function pull(force = false): Promise<void> {
       // (except the demo projects, once real data exists), then upload it.
       for (const p of local) {
         // a fresh browser re-creates the demo projects; never let those replace shared data
-        if (p.id.startsWith('demo-') && (server.length > 0 || deleted[p.id])) continue;
+        if (p.id.startsWith('demo-') && (server.length > 0 || deleted[p.id] || me.role === 'sales')) continue;
+        // a salesperson only keeps (and uploads) their own projects
+        if (me.role === 'sales' && p.salespersonId !== me.salespersonId) continue;
         const s = byId.get(p.id);
         if (s && !newer(p.updatedAt, s.updatedAt)) continue;
         if (!s && deleted[p.id] && !newer(p.updatedAt, deleted[p.id])) continue;
         byId.set(p.id, p);
         upsert.add(p.id);
       }
-      if (!data.settings) settingsPending = true;
+      if (!data.settings && me.role === 'admin') settingsPending = true;
       synced = true;
     } else {
       // Keep this device's changes that haven't been uploaded yet.
@@ -254,6 +302,7 @@ async function push(): Promise<void> {
     }
 
     let savedAt: string | null = null;
+    const rejected = new Set<string>();
     for (let i = 0; i < batches.length; i++) {
       const body: Record<string, unknown> = { upsert: batches[i] };
       if (i === batches.length - 1) {
@@ -264,6 +313,7 @@ async function push(): Promise<void> {
       const out = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(out.error || `Saving failed (${res.status}).`);
       savedAt = out.savedAt ?? savedAt;
+      (Array.isArray(out.rejected) ? out.rejected : []).forEach((id: string) => rejected.add(id));
     }
 
     // clear what was uploaded, unless it changed again meanwhile
@@ -273,6 +323,16 @@ async function push(): Promise<void> {
       remove.delete(id);
     }
     if (sentSettings === settingsVersion) settingsPending = false;
+    // Changes the server refused (projects that aren't this salesperson's): stop retrying, and drop
+    // any such project from this device.
+    if (rejected.size) {
+      rejected.forEach((id) => {
+        upsert.delete(id);
+        remove.delete(id);
+      });
+      const kept = host.getProjects().filter((p) => !rejected.has(p.id) || p.salespersonId === me.salespersonId);
+      host.apply(kept);
+    }
     savePending();
     setStatus({ state: 'saved', savedAt, message: undefined });
   } catch (err) {

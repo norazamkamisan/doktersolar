@@ -1,7 +1,8 @@
 // Merge rules for the shared data file (pure functions, tested in tests/data-merge.test.mjs).
 //
 // File shape:
-//   { format: 'doktersolar.v1', savedAt, settings, projects: Project[], deleted: { [id]: deletedAtIso } }
+//   { format: 'doktersolar.v1', savedAt, settings, projects: Project[], deleted: { [id]: deletedAtIso },
+//     users: salesperson logins (see server/access.mjs; never sent to the app) }
 //
 // Each project carries `updatedAt`; the newer copy wins. Deleted projects leave a tombstone so a
 // device that was offline can't bring them back with an older copy.
@@ -10,7 +11,7 @@ export const FORMAT = 'doktersolar.v1';
 const MAX_TOMBSTONES = 5000;
 
 export function emptyData() {
-  return { format: FORMAT, savedAt: null, settings: null, projects: [], deleted: {} };
+  return { format: FORMAT, savedAt: null, settings: null, projects: [], deleted: {}, users: [] };
 }
 
 /** Parse the file's text; an empty or unrelated file counts as empty data. */
@@ -29,6 +30,7 @@ export function parseData(text) {
     settings: raw.settings ?? null,
     projects: Array.isArray(raw.projects) ? raw.projects : [],
     deleted: raw.deleted && typeof raw.deleted === 'object' ? raw.deleted : {},
+    users: Array.isArray(raw.users) ? raw.users : [],
   };
 }
 
@@ -67,5 +69,6 @@ export function applyChanges(data, { upsert = [], remove = [], settings } = {}, 
     settings: settings === undefined ? data.settings : settings,
     projects: [...byId.values()].sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt))),
     deleted: trimmed,
+    users: data.users ?? [],
   };
 }

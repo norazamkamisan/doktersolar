@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { ImagePlus, RotateCcw, Trash2 } from 'lucide-react';
 import { resetDemoData, updateSettings, useSettings } from '../lib/store';
-import { useSyncStatus } from '../lib/sync';
+import { useMe, useSyncStatus } from '../lib/sync';
 import { CURRENCIES } from '../lib/format';
 import { Field, NumberField, PageHeader } from '../components/ui';
 import { BrandLogo } from '../components/Logo';
@@ -34,6 +34,19 @@ function fileToLogo(file: File): Promise<string> {
 }
 
 export default function SettingsPage() {
+  const me = useMe();
+  if (me.role === 'sales') {
+    return (
+      <div className="mx-auto max-w-4xl p-4 sm:p-6">
+        <PageHeader title="Settings" />
+        <p className="card p-5 text-sm text-slate-600">Settings are managed by your admin.</p>
+      </div>
+    );
+  }
+  return <AdminSettings />;
+}
+
+function AdminSettings() {
   const s = useSettings();
   const sync = useSyncStatus();
   const fileRef = useRef<HTMLInputElement>(null);

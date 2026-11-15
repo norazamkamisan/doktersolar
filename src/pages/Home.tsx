@@ -1,7 +1,8 @@
 ﻿import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { CheckCircle2, FolderKanban, Send, Zap } from 'lucide-react';
-import { useProjects, useSettings } from '../lib/store';
+import { useProjects } from '../lib/store';
+import { useCurrentName } from '../components/Salespeople';
 import { num } from '../lib/format';
 import { PageHeader, StatCard } from '../components/ui';
 import { CountBarChart } from '../components/Charts';
@@ -10,7 +11,7 @@ import Pipeline from '../components/Pipeline';
 
 export default function Home() {
   const projects = useProjects();
-  const settings = useSettings();
+  const name = useCurrentName();
 
   const stats = useMemo(() => {
     const active = projects.filter((p) => p.status !== 'Installed').length;
@@ -36,7 +37,7 @@ export default function Home() {
 
   return (
     <div className="mx-auto max-w-7xl p-4 sm:p-6">
-      <PageHeader title="Dashboard" subtitle={`Hi ${settings.userName || 'there'} — here's how your solar pipeline is looking.`} />
+      <PageHeader title="Dashboard" subtitle={`Hi ${name || 'there'} — here's how your solar pipeline is looking.`} />
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard label="Active projects" value={num(stats.active)} hint={`${num(projects.length)} total`} icon={<FolderKanban className="h-4 w-4" />} />
