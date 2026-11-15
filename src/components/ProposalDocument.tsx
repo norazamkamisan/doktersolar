@@ -1,6 +1,6 @@
 import { forwardRef, useMemo } from 'react';
 import type { Project, Settings } from '../types';
-import { MONTHS, energyFor, financialsFor, layoutPanels } from '../lib/solar';
+import { MONTHS, compass, energyFor, financialsFor, layoutPanels } from '../lib/solar';
 import { date, money, num } from '../lib/format';
 import SolarMap from './SolarMap';
 import { LogoMark } from './Logo';
@@ -166,8 +166,8 @@ const ProposalDocument = forwardRef<HTMLElement, { project: Project; settings: D
       {/* map */}
       <section className="avoid-break mt-6">
         <h2 className="mb-3 text-lg font-semibold text-slate-900">Panel layout</h2>
-        {p.design.roof.length >= 3 ? (
-          <SolarMap center={center} roof={p.design.roof} panels={layout.panels} staticView className={r('h-[340px] sm:h-[400px]', 'h-[400px]')} />
+        {layout.faces.length ? (
+          <SolarMap center={center} roofs={layout.faces.map((f) => f.roof)} panels={layout.panels} staticView className={r('h-[340px] sm:h-[400px]', 'h-[400px]')} />
         ) : (
           <p className="rounded-xl bg-slate-50 p-6 text-sm text-slate-500">Roof layout not yet drawn.</p>
         )}
@@ -207,7 +207,12 @@ const ProposalDocument = forwardRef<HTMLElement, { project: Project; settings: D
             <tbody className="divide-y divide-slate-100">
               {[
                 ['Solar panels', `${p.panelCount} × ${p.design.panelWattage} W (${p.design.panelWidth} × ${p.design.panelHeight} m, ${p.design.orientation})`],
-                ['Tilt / azimuth', `${p.design.tilt}° / ${p.design.azimuth}°`],
+                layout.faces.length > 1
+                  ? [
+                      'Roof faces',
+                      layout.faces.map((f) => `${f.panels.length} panels facing ${compass(f.azimuth)} (${f.azimuth}°), ${f.tilt}° tilt`).join('; '),
+                    ]
+                  : ['Tilt / azimuth', `${p.design.tilt}° / ${p.design.azimuth}°`],
                 ['Production model', energy.source === 'pvwatts' ? 'PVWatts v8 by NLR (location weather data)' : `${p.energy.peakSunHours} peak sun hours × 365 × 0.8 performance ratio`],
                 ['Electricity tariff', `${money(p.energy.tariff, s.currency, 3)} per kWh, rising ${p.energy.escalation}% per year`],
                 ['Panel degradation', `${p.energy.degradation}% per year`],

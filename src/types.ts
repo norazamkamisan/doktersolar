@@ -7,8 +7,23 @@ export const STATUSES: ProjectStatus[] = ['Lead', 'Designing', 'Proposal Sent', 
 /** [lat, lng] */
 export type LatLng = [number, number];
 
+/** One roof face: its outline and which way / how steeply it slopes. */
+export interface RoofFace {
+  roof: LatLng[];
+  /** degrees from horizontal */
+  tilt: number;
+  /** degrees, 0 = north, 90 = east, 180 = south, 270 = west */
+  azimuth: number;
+}
+
+/**
+ * The first roof face is stored in `roof` / `tilt` / `azimuth` (as before multi-roof designs);
+ * further faces go in `extraRoofs`. Use `roofFaces()` / `facesPatch()` in lib/solar.ts.
+ */
 export interface DesignSettings {
   roof: LatLng[];
+  /** roof faces after the first */
+  extraRoofs?: RoofFace[];
   panelWattage: number;
   /** short side, metres */
   panelWidth: number;
