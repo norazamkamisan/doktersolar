@@ -16,7 +16,7 @@ beforeEach(() => {
 });
 
 test('public paths pass through without a session', async () => {
-  for (const path of ['/proposals/demo-3', '/proposals/demo-3/', '/assets/index-abc.js', '/favicon.svg', '/_vercel/insights/script.js']) {
+  for (const path of ['/proposals/demo-3', '/proposals/demo-3/', '/assets/index-abc.js', '/favicon.svg', '/_vercel/insights/script.js', '/manifest.webmanifest', '/icons/icon-192.png']) {
     assert.ok(isPassThrough(await get(path)), path);
   }
 });

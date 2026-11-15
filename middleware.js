@@ -7,6 +7,7 @@
 // Public without a password:
 //   /proposals/<id>   shared customer proposal links
 //   /assets/*, /favicon.svg, /_vercel/*   static files and Vercel analytics
+//   /manifest.webmanifest, /icons/*        app install details and icons (phones fetch them without the cookie)
 //
 // Not run by `npm run dev` / `vite preview`; local development stays open.
 
@@ -27,6 +28,8 @@ export function isPublicPath(path) {
     path.startsWith('/assets/') ||
     path.startsWith('/_vercel/') ||
     path === '/favicon.svg' ||
+    path === '/manifest.webmanifest' ||
+    path.startsWith('/icons/') ||
     path === '/robots.txt' ||
     /^\/proposals\/[^/]+\/?$/.test(path) // a single shared proposal, not the /proposals list
   );
@@ -190,6 +193,11 @@ function page(title, body) {
 <meta name="robots" content="noindex">
 <title>${escapeHtml(title)} · DokterSolar</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#f97316">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="DokterSolar">
 <style>
   *{box-sizing:border-box}
   body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px;
