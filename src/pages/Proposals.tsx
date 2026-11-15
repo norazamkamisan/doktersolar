@@ -16,7 +16,7 @@ export default function Proposals() {
         .filter((p) => p.systemKw > 0)
         .map((p) => {
           const e = energyFor(p);
-          return { p, e, f: financialsFor(p, e.annualKwh) };
+          return { p, e, f: financialsFor(p, e) };
         })
         .sort((a, b) => (b.p.proposalSentAt ?? b.p.updatedAt).localeCompare(a.p.proposalSentAt ?? a.p.updatedAt)),
     [projects],

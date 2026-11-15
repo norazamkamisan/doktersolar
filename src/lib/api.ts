@@ -99,7 +99,8 @@ async function pvWattsArray(lat: number, lng: number, kw: number, tilt: number, 
 
 export interface SharePayload {
   p: Project;
-  s: Omit<Settings, 'logo'>;
+  /** images (logo, cover photo, case-study pictures) are left out to keep links short */
+  s: Omit<Settings, 'logo' | 'coverImage'>;
 }
 
 // Two fragment formats:
@@ -124,7 +125,8 @@ async function pipeBytes(bytes: Uint8Array, stream: CompressionStream | Decompre
 
 function buildPayload(p: Project, s: Settings): SharePayload {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { logo: _logo, ...rest } = s;
+  const { logo: _logo, coverImage: _cover, caseStudies, ...others } = s;
+  const rest = { ...others, caseStudies: (caseStudies ?? []).map((c) => ({ ...c, image: null })) };
   const round = (ring: LatLng[]) => ring.map(([a, b]) => [+a.toFixed(7), +b.toFixed(7)] as LatLng);
   const design = { ...p.design, roof: round(p.design.roof), extraRoofs: p.design.extraRoofs?.map((f) => ({ ...f, roof: round(f.roof) })) };
   return { p: { ...p, notes: '', design }, s: rest };

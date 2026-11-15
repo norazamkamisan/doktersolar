@@ -282,7 +282,69 @@ export function degradationText(e: Pick<Project['energy'], 'firstYearDegradation
   return first === e.degradation ? `${first}% per year` : `${first}% in the first year, then ${e.degradation}% per year`;
 }
 
+/** Price before any discount: the quoted price, or kWp × price per watt. */
+export function totalSystemPrice(p: Project): number {
+  const q = p.quote?.systemPrice;
+  return q != null && q > 0 ? q : p.systemKw * 1000 * p.energy.pricePerWatt;
+}
+
+/** What the customer pays: total price less any discount or rebate. */
+export function netSystemPrice(p: Project): number {
+  return Math.max(0, totalSystemPrice(p) - (p.quote?.discount ?? 0));
+}
+
+export interface BillMonth {
+  month: string;
+  /** solar generation, kWh */
+  solarKwh: number;
+  /** electricity used, kWh */
+  usageKwh: number;
+  /** usage minus solar; negative = more solar than used (exported) */
+  netKwh: number;
+  billBefore: number;
+  billAfter: number;
+  /** export credit carried to later months, money */
+  credit: number;
+  savings: number;
+}
+
+/**
+ * One year of monthly bills with and without solar. Use is spread over the months by their number
+ * of days. Solar first covers that month's use; any extra is exported and credited at the same
+ * rate against later months' bills in the same year (net metering), and credit left at the end of
+ * the year is lost. `fixedCharge` stays on the bill either way, so it doesn't change the savings.
+ * With no known use, every kWh of solar counts as a saving.
+ */
+export function billYear(p: Project, monthlyGenKwh: number[], year: number, fixedCharge = 0): BillMonth[] {
+  const e = p.energy;
+  const tariff = e.tariff * Math.pow(1 + e.escalation / 100, year - 1);
+  const factor = outputFactor(e, year);
+  const annualUse = annualUsageKwh(p);
+  let credit = 0;
+  return monthlyGenKwh.map((g0, m) => {
+    const solarKwh = g0 * factor;
+    if (annualUse <= 0) {
+      const savings = solarKwh * tariff;
+      return { month: MONTHS[m], solarKwh, usageKwh: 0, netKwh: -solarKwh, billBefore: fixedCharge, billAfter: fixedCharge - savings, credit: 0, savings };
+    }
+    const usageKwh = (annualUse * DAYS[m]) / 365;
+    const netKwh = usageKwh - solarKwh;
+    const billBefore = fixedCharge + usageKwh * tariff;
+    let billAfter = fixedCharge;
+    if (netKwh >= 0) {
+      const cost = netKwh * tariff;
+      const used = Math.min(credit, cost);
+      credit -= used;
+      billAfter += cost - used;
+    } else {
+      credit += -netKwh * tariff;
+    }
+    return { month: MONTHS[m], solarKwh, usageKwh, netKwh, billBefore, billAfter, credit, savings: billBefore - billAfter };
+  });
+}
+
 export interface Financials {
+  /** net system price (after discount) */
   systemCost: number;
   firstYearSavings: number;
   savings25: number;
@@ -292,17 +354,14 @@ export interface Financials {
   cashflow: { year: number; cumulative: number; savings: number }[];
 }
 
-export function financialsFor(p: Project, annualKwh: number): Financials {
-  const e = p.energy;
-  const systemCost = p.systemKw * 1000 * e.pricePerWatt;
+export function financialsFor(p: Project, energy: Pick<EnergyResult, 'monthlyKwh'>): Financials {
+  const systemCost = netSystemPrice(p);
   let cumulative = -systemCost;
   let total = 0;
   let paybackYears: number | null = null;
   const cashflow = [{ year: 0, cumulative, savings: 0 }];
   for (let y = 1; y <= 25; y++) {
-    const prod = annualKwh * outputFactor(e, y);
-    const tariff = e.tariff * Math.pow(1 + e.escalation / 100, y - 1);
-    const savings = prod * tariff;
+    const savings = billYear(p, energy.monthlyKwh, y).reduce((s, m) => s + m.savings, 0);
     const before = cumulative;
     cumulative += savings;
     total += savings;
@@ -319,5 +378,39 @@ export function financialsFor(p: Project, annualKwh: number): Financials {
     netSavings25: total - systemCost,
     paybackYears,
     cashflow,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Environmental benefits                                              */
+/* ------------------------------------------------------------------ */
+
+/** Malaysian grid emission factor, kg CO₂ per kWh (Peninsular grid, approx.) */
+export const GRID_KG_CO2_PER_KWH = 0.758;
+/** kg CO₂ per km for an average petrol car (approx.) */
+const CAR_KG_CO2_PER_KM = 0.79;
+/** kg CO₂ a tree takes up over its growing life (approx.) */
+const TREE_KG_CO2 = 123;
+/** tonnes CO₂ per passenger for a long-haul return flight (approx.) */
+const FLIGHT_T_CO2 = 1.1;
+
+export interface Environment {
+  /** tonnes CO₂ avoided in the first year */
+  co2TonsPerYear: number;
+  carKm: number;
+  trees: number;
+  flights: number;
+}
+
+/** CO₂ avoided by the system's production over 25 years, and everyday equivalents. */
+export function environmentFor(p: Project, annualKwh: number): Environment {
+  let lifetimeKwh = 0;
+  for (let y = 1; y <= 25; y++) lifetimeKwh += annualKwh * outputFactor(p.energy, y);
+  const lifetimeKg = lifetimeKwh * GRID_KG_CO2_PER_KWH;
+  return {
+    co2TonsPerYear: (annualKwh * outputFactor(p.energy, 1) * GRID_KG_CO2_PER_KWH) / 1000,
+    carKm: lifetimeKg / CAR_KG_CO2_PER_KM,
+    trees: lifetimeKg / TREE_KG_CO2,
+    flights: lifetimeKg / 1000 / FLIGHT_T_CO2,
   };
 }
