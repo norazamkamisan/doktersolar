@@ -8,6 +8,8 @@ import Designs from './pages/Designs';
 import Proposals from './pages/Proposals';
 import ProposalView from './pages/ProposalView';
 import SettingsPage from './pages/Settings';
+import CashflowPage from './pages/Cashflow';
+import PriceListPage from './pages/PriceList';
 
 export default function App() {
   return (
@@ -23,6 +25,8 @@ export default function App() {
         <Route path="/leads" element={<Leads />} />
         <Route path="/designs" element={<Designs />} />
         <Route path="/proposals" element={<Proposals />} />
+        <Route path="/cashflow" element={<CashflowPage />} />
+        <Route path="/prices" element={<PriceListPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/home" replace />} />
       </Route>

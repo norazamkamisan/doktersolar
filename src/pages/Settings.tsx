@@ -7,6 +7,7 @@ import { Field, NumberField, PageHeader } from '../components/ui';
 import { BrandLogo } from '../components/Logo';
 import OpenSolarImportCard from '../components/OpenSolarImportCard';
 import ProposalSettings from '../components/ProposalSettings';
+import CostingSettings from '../components/CostingSettings';
 import SalesTeamSettings from '../components/Salespeople';
 
 /** Read an image file, downscale it to fit 400×160 and return a base64 data URL. */
@@ -178,6 +179,8 @@ function AdminSettings() {
         </section>
 
         <ProposalSettings s={s} />
+
+        <CostingSettings />
 
         <OpenSolarImportCard />
 

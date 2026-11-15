@@ -8,12 +8,16 @@ import InfoTab from './project/InfoTab';
 import DesignTab from './project/DesignTab';
 import EnergyTab from './project/EnergyTab';
 import ProposalTab from './project/ProposalTab';
+import CostingTab from './project/CostingTab';
+import CashflowTab from './project/CashflowTab';
 
 const TABS = [
   { key: 'info', label: 'Info' },
   { key: 'design', label: 'Design' },
   { key: 'energy', label: 'Energy' },
   { key: 'proposal', label: 'Proposal' },
+  { key: 'costing', label: 'Costing' },
+  { key: 'cashflow', label: 'Cashflow' },
 ] as const;
 
 export default function ProjectDetail() {
@@ -90,6 +94,8 @@ export default function ProjectDetail() {
       {tab === 'design' && <DesignTab project={project} />}
       {tab === 'energy' && <EnergyTab project={project} />}
       {tab === 'proposal' && <ProposalTab project={project} />}
+      {tab === 'costing' && <CostingTab project={project} />}
+      {tab === 'cashflow' && <CashflowTab project={project} />}
     </div>
   );
 }

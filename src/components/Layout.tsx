@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { FileText, FolderKanban, Home, LayoutGrid, LogOut, Menu, Plus, Search, Settings, UserPlus, X } from 'lucide-react';
+import { FileText, FolderKanban, Home, LayoutGrid, LogOut, Menu, Plus, Search, Settings, Tags, UserPlus, Wallet, X } from 'lucide-react';
 import { BrandLogo } from './Logo';
 import NewProjectModal from './NewProjectModal';
 import SyncStatus from './SyncStatus';
@@ -15,6 +15,8 @@ const NAV = [
   { to: '/leads', label: 'Leads', icon: UserPlus },
   { to: '/designs', label: 'Designs', icon: LayoutGrid },
   { to: '/proposals', label: 'Proposals', icon: FileText },
+  { to: '/cashflow', label: 'Cashflow', icon: Wallet },
+  { to: '/prices', label: 'Price List', icon: Tags },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
