@@ -53,12 +53,15 @@ export interface EnergySettings {
   /** average rate, currency per kWh: used for the flat tariff, and as a fallback with no usage */
   tariff: number;
   /**
-   * How bills are worked out: TNB Domestic General or ToU (tariff from 1 July 2025), or one flat
-   * rate. Left out: TNB Domestic, except projects from a non-residential TNB bill (flat).
+   * How bills are worked out: a TNB tariff from 1 July 2025 (Domestic, or Non-Domestic Low /
+   * Medium / High Voltage; General or ToU), or one flat rate. Left out: TNB Domestic, or the
+   * matching Non-Domestic tariff for a shop or factory bill.
    */
-  tariffModel?: 'tnb' | 'tnb-tou' | 'flat';
-  /** Domestic ToU: share of use in the peak period, % */
+  tariffModel?: 'tnb' | 'tnb-tou' | 'lv' | 'lv-tou' | 'mv' | 'mv-tou' | 'hv' | 'hv-tou' | 'flat';
+  /** ToU tariffs: share of use in the peak period, % */
   touPeakPct?: number;
+  /** Medium / High Voltage: maximum demand, kW (else from the scanned bill) */
+  maxDemandKw?: number;
   /** currency per watt (installed) */
   pricePerWatt: number;
   /** degradation in the first year, % (older projects don't have it: see normalizeProject) */
