@@ -89,6 +89,7 @@ export interface Project {
   /** the scanned TNB bill this project was created from */
   bill?: ProjectBill;
   proposalSentAt: string | null;
+  quote?: ProjectQuote;
 }
 
 export interface ProjectBill extends TnbBill {
@@ -118,11 +119,56 @@ export interface Settings {
   /** shown on proposals */
   panelWarrantyYears: number;
   performanceWarrantyYears: number;
+  /** inverter brand, e.g. "Solis / Sungrow or equivalent" */
   inverter: string;
   inverterWarrantyYears: number;
   pricePerWatt: number;
   tariff: number;
   currency: string;
   peakSunHours: number;
+  /** the salesperson preparing proposals ("Prepared by") */
   userName: string;
+  userPhone: string;
+  userEmail: string;
+  /** company address, one line per line */
+  companyAddress: string;
+  companyWebsite: string;
+  /** proposal cover photo (data URL), or null for the built-in banner */
+  coverImage: string | null;
+  /** cover letter text below "Dear …," */
+  coverLetter: string;
+  /** "About us" page; empty = no page */
+  aboutUs: string;
+  panelBrand: string;
+  panelModel: string;
+  /** deposit payable on acceptance, % of the price */
+  depositPct: number;
+  /** small print under the quotation */
+  quoteNote: string;
+  /** "Payment details" under the quote acceptance */
+  paymentDetails: string;
+  /** terms & conditions page; placeholders {customer} {address} {price} {deposit} {depositPct}. Empty = no page */
+  terms: string;
+  caseStudies: CaseStudy[];
+  /** fixed monthly charge on the electricity bill (stays after solar) */
+  fixedCharge: number;
+}
+
+export interface CaseStudy {
+  title: string;
+  text: string;
+  /** data URL, optional */
+  image: string | null;
+}
+
+/** Per-project quotation details (all optional; defaults are worked out from the design and settings). */
+export interface ProjectQuote {
+  inverterModel?: string;
+  /** total inverter rating, kW */
+  inverterKw?: number;
+  inverterQty?: number;
+  /** total system price; default kWp × price per watt */
+  systemPrice?: number;
+  /** rebate or discount taken off the total */
+  discount?: number;
 }

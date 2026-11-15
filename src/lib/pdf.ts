@@ -4,13 +4,13 @@
  *
  * The caller renders the proposal off-screen at a fixed A4-like width with a system font
  * (see ProposalActions), so the PDF looks the same on phones and desktops, and the text
- * measured on the page matches the text drawn into the images. Each top-level block becomes
- * an image placed on A4 pages, moving to a new page rather than splitting a block.
+ * measured on the page matches the text drawn into the images. Each proposal page becomes one
+ * A4 page of the PDF.
  * The PDF libraries are loaded on demand.
  */
 
-/** Width the off-screen proposal is laid out at, in CSS px (≈ A4 content width at 96 dpi). */
-export const PDF_RENDER_WIDTH = 760;
+/** Width the off-screen proposal is laid out at, in CSS px (A4 at 96 dpi). */
+export const PDF_RENDER_WIDTH = 794;
 
 /** System fonts are available inside the captured images; web fonts (Inter) are not. */
 export const PDF_FONT_STACK = 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
@@ -38,48 +38,29 @@ export async function downloadProposalPdf(article: HTMLElement, fileName: string
 
   const PAGE_W = 210;
   const PAGE_H = 297;
-  const MARGIN = 12;
-  const CONTENT_W = PAGE_W - MARGIN * 2;
-  const CONTENT_H = PAGE_H - MARGIN * 2;
-
   const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
 
-  let y = MARGIN;
-  for (const block of Array.from(article.children) as HTMLElement[]) {
-    const width = block.offsetWidth;
-    const height = block.scrollHeight;
+  // Each [data-pdf-page] element is laid out at A4 size (see ProposalDocument) and becomes one page.
+  const pages = Array.from(article.querySelectorAll<HTMLElement>('[data-pdf-page]'));
+  for (let i = 0; i < pages.length; i++) {
+    const page = pages[i];
+    const width = page.offsetWidth;
+    const height = page.offsetHeight;
     if (!width || !height) continue;
-
-    const mmPerPx = CONTENT_W / width;
-    let w = CONTENT_W;
-    let h = height * mmPerPx;
-    const gap = y > MARGIN ? parseFloat(getComputedStyle(block).marginTop || '0') * mmPerPx : 0;
-
-    if (y + gap + h > PAGE_H - MARGIN && y > MARGIN) {
-      pdf.addPage();
-      y = MARGIN;
-    } else {
-      y += gap;
-    }
-    if (h > CONTENT_H) {
-      // a single block taller than a page: shrink it to fit
-      w = (CONTENT_W * CONTENT_H) / h;
-      h = CONTENT_H;
-    }
-
-    const image = await toJpeg(block, {
+    const image = await toJpeg(page, {
       width,
       height,
       pixelRatio: 2,
-      quality: 0.92,
+      quality: 0.9,
       backgroundColor: '#ffffff',
-      // The block's margin would shift its content down inside an image of the block's own height,
-      // clipping the bottom. Spacing between blocks is added by the page layout above instead.
-      style: { margin: '0' },
       skipFonts: true, // the off-screen copy uses system fonts, so nothing needs embedding
     });
-    pdf.addImage(image, 'JPEG', MARGIN + (CONTENT_W - w) / 2, y, w, h, undefined, 'FAST');
-    y += h;
+    if (i > 0) pdf.addPage();
+    // fit the page image to A4 (it already has A4 proportions)
+    const scale = Math.min(PAGE_W / width, PAGE_H / height);
+    const w = width * scale;
+    const h = height * scale;
+    pdf.addImage(image, 'JPEG', (PAGE_W - w) / 2, 0, w, h, undefined, 'FAST');
   }
 
   pdf.save(fileName);

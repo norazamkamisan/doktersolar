@@ -5,6 +5,7 @@ import { updateProject, useSettings } from '../../lib/store';
 import { date } from '../../lib/format';
 import ProposalDocument from '../../components/ProposalDocument';
 import ProposalActions from '../../components/ProposalActions';
+import QuoteEditor from '../../components/QuoteEditor';
 
 export default function ProposalTab({ project: p }: { project: Project }) {
   const settings = useSettings();
@@ -35,6 +36,7 @@ export default function ProposalTab({ project: p }: { project: Project }) {
           <ProposalActions project={p} settings={settings} compact />
         </div>
       </div>
+      <QuoteEditor project={p} settings={settings} />
       <ProposalDocument project={p} settings={settings} />
     </div>
   );

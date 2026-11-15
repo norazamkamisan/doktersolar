@@ -6,6 +6,7 @@ import { CURRENCIES } from '../lib/format';
 import { Field, NumberField, PageHeader } from '../components/ui';
 import { BrandLogo } from '../components/Logo';
 import OpenSolarImportCard from '../components/OpenSolarImportCard';
+import ProposalSettings from '../components/ProposalSettings';
 
 /** Read an image file, downscale it to fit 400×160 and return a base64 data URL. */
 function fileToLogo(file: File): Promise<string> {
@@ -74,9 +75,19 @@ export default function SettingsPage() {
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Company name" value={s.companyName} onChange={(e) => updateSettings({ companyName: e.target.value })} />
-            <Field label="Your name" value={s.userName} onChange={(e) => updateSettings({ userName: e.target.value })} />
+            <Field label="Company website" value={s.companyWebsite} onChange={(e) => updateSettings({ companyWebsite: e.target.value })} />
             <Field label="Company email" type="email" value={s.companyEmail} onChange={(e) => updateSettings({ companyEmail: e.target.value })} />
             <Field label="Company phone" value={s.companyPhone} onChange={(e) => updateSettings({ companyPhone: e.target.value })} />
+            <div className="sm:col-span-2">
+              <label className="label">Company address</label>
+              <textarea className="input leading-relaxed" rows={3} value={s.companyAddress} onChange={(e) => updateSettings({ companyAddress: e.target.value })} />
+            </div>
+          </div>
+          <h3 className="mb-3 mt-6 font-medium text-slate-900">Prepared by</h3>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field label="Your name" value={s.userName} onChange={(e) => updateSettings({ userName: e.target.value })} />
+            <Field label="Your phone" value={s.userPhone} onChange={(e) => updateSettings({ userPhone: e.target.value })} />
+            <Field label="Your email" type="email" value={s.userEmail} onChange={(e) => updateSettings({ userEmail: e.target.value })} />
           </div>
         </section>
 
@@ -114,8 +125,10 @@ export default function SettingsPage() {
 
         <section className="card p-5 sm:p-6">
           <h2 className="font-semibold text-slate-900">Equipment & warranties</h2>
-          <p className="mb-5 text-sm text-slate-500">Shown in the system details of every proposal.</p>
+          <p className="mb-5 text-sm text-slate-500">Shown on every proposal and quotation.</p>
           <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Panel brand" value={s.panelBrand} placeholder="e.g. Trina Solar" onChange={(e) => updateSettings({ panelBrand: e.target.value })} />
+            <Field label="Panel model" value={s.panelModel} placeholder="e.g. TSM-620NE19R" onChange={(e) => updateSettings({ panelModel: e.target.value })} />
             <NumberField
               label="Panel product warranty"
               suffix="years"
@@ -132,7 +145,7 @@ export default function SettingsPage() {
               step={1}
               onChange={(v) => updateSettings({ performanceWarrantyYears: Math.max(0, Math.round(v)) })}
             />
-            <Field label="Inverter" value={s.inverter} onChange={(e) => updateSettings({ inverter: e.target.value })} />
+            <Field label="Inverter brand" value={s.inverter} onChange={(e) => updateSettings({ inverter: e.target.value })} />
             <NumberField
               label="Inverter product warranty"
               suffix="years"
@@ -143,6 +156,8 @@ export default function SettingsPage() {
             />
           </div>
         </section>
+
+        <ProposalSettings s={s} />
 
         <OpenSolarImportCard />
 

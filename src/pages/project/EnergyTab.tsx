@@ -13,7 +13,7 @@ export default function EnergyTab({ project: p }: { project: Project }) {
   const { currency } = useSettings();
   const e = p.energy;
   const energy = energyFor(p);
-  const fin = financialsFor(p, energy.annualKwh);
+  const fin = financialsFor(p, energy);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 

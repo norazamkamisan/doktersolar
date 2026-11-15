@@ -52,7 +52,7 @@ export default function ProposalView() {
 
   // live data wins on the installer's own browser; customers see the shared snapshot
   const project = local ?? shared?.p;
-  const settings = local || !shared ? localSettings : { ...shared.s, logo: null };
+  const settings = local || !shared ? localSettings : { ...shared.s, logo: null, coverImage: null };
 
   if (loading) {
     return (
