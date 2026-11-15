@@ -49,6 +49,14 @@ export const DEFAULT_SETTINGS: Settings = {
   salespeople: [],
   fixedCharge: 10,
   afaSen: 3.6,
+  priceList: [],
+  sstPct: 8,
+  markupPct: 20,
+  contingencyPct: 5,
+  costCategories: ['PV Module', 'Inverter', 'Mounting', 'Electrical BOS', 'Labour', 'Subcon', 'Transport', 'Preliminaries', 'Overhead', 'Others'],
+  costUnits: ['LS', 'Pcs', 'Nos', 'Pair', 'Set', 'Unit', 'Roll', 'Box', 'Tube', 'Length', 'm', 'm2', 'Day', 'Month', 'kWp'],
+  cashCategories: ['Material', 'Labour', 'Subcontractor', 'Machinery', 'Transport', 'Overhead', 'Preliminaries', 'Others'],
+  payMethods: ['Bank Transfer', 'Cash', 'Cheque', 'Online / FPX'],
 };
 
 export function defaultDesign(s: Settings): DesignSettings {

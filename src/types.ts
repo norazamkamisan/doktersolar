@@ -102,6 +102,10 @@ export interface Project {
   quote?: ProjectQuote;
   /** Settings.salespeople id: who prepared the proposal */
   salespersonId?: string;
+  /** cost build-up behind the quotation (Costing tab) */
+  costing?: ProjectCosting;
+  /** payments to make and money in/out for this job (Cashflow tab) */
+  cashflow?: ProjectCashflow;
 }
 
 export interface ProjectBill extends TnbBill {
@@ -168,6 +172,17 @@ export interface Settings {
   fixedCharge: number;
   /** TNB Automatic Fuel Adjustment, sen/kWh: changes monthly */
   afaSen: number;
+  /** supplier price list for costing (the admin edits it; everyone reads it) */
+  priceList: PriceItem[];
+  /** costing defaults for new cost build-ups, % */
+  sstPct: number;
+  markupPct: number;
+  contingencyPct: number;
+  /** dropdown lists */
+  costCategories: string[];
+  costUnits: string[];
+  cashCategories: string[];
+  payMethods: string[];
 }
 
 export interface Salesperson {
@@ -194,4 +209,105 @@ export interface ProjectQuote {
   systemPrice?: number;
   /** rebate or discount taken off the total */
   discount?: number;
+}
+
+/* ------------------------------------------------------------------ */
+/* Costing & cashflow                                                  */
+/* ------------------------------------------------------------------ */
+
+export interface CostItem {
+  id: string;
+  description: string;
+  category: string;
+  unit: string;
+  qty: number;
+  /** cost per unit */
+  rate: number;
+  /** markup on this item, %; left out = the costing default */
+  markupPct?: number;
+  remarks: string;
+}
+
+export interface CostScenario {
+  name: string;
+  markupPct: number;
+}
+
+export interface ProjectCosting {
+  items: CostItem[];
+  markupPct: number;
+  /** of total direct cost, % */
+  contingencyPct: number;
+  /** SST on the selling price, % */
+  sstPct: number;
+  /**
+   * 'proposal': the final quotation is the proposal price (Total System Price less any discount),
+   * SST included, and one markup is worked out for every item. 'markup': built up from item markups.
+   */
+  priceFrom: 'proposal' | 'markup';
+  scenarios: CostScenario[];
+}
+
+export const PAY_STATUSES = ['Not Paid', 'Partial', 'Paid', 'Overdue', 'Hold', 'Cancelled'] as const;
+export type PayStatus = (typeof PAY_STATUSES)[number];
+export const PRIORITIES = ['Critical', 'High', 'Medium', 'Low'] as const;
+export type Priority = (typeof PRIORITIES)[number];
+
+/** A payment we have to make (supplier, subcon, crew). */
+export interface PaymentRow {
+  id: string;
+  /** yyyy-mm-dd, or '' when not known */
+  due: string;
+  payee: string;
+  category: string;
+  description: string;
+  ref: string;
+  amount: number;
+  status: PayStatus;
+  paid: number;
+  priority: Priority;
+  remarks: string;
+}
+
+/** Money from the customer: a claim, milestone or VO. */
+export interface CashInRow {
+  id: string;
+  /** received or expected, yyyy-mm-dd or '' */
+  date: string;
+  ref: string;
+  received: number;
+  outstanding: number;
+  status: PayStatus;
+  remarks: string;
+}
+
+/** Money actually paid out. */
+export interface CashOutRow {
+  id: string;
+  date: string;
+  payee: string;
+  category: string;
+  description: string;
+  amount: number;
+  method: string;
+  remarks: string;
+}
+
+export interface ProjectCashflow {
+  payments: PaymentRow[];
+  cashIn: CashInRow[];
+  cashOut: CashOutRow[];
+}
+
+export interface PriceItem {
+  id: string;
+  category: string;
+  item: string;
+  uom: string;
+  /** cost per unit; null = waiting for a supplier quote (RFQ) */
+  price: number | null;
+  supplier: string;
+  note: string;
+  /** yyyy-mm-dd the price was last set */
+  updated: string;
 }
