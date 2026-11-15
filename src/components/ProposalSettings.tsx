@@ -93,7 +93,7 @@ export default function ProposalSettings({ s }: { s: Settings }) {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <NumberField label="Deposit payable" suffix="%" value={s.depositPct} min={0} step={1} onChange={(v) => updateSettings({ depositPct: Math.min(100, Math.max(0, v)) })} />
-        <NumberField label="Fixed charge on the bill" suffix={`${s.currency}/month`} value={s.fixedCharge} min={0} step={1} onChange={(v) => updateSettings({ fixedCharge: Math.max(0, v) })} />
+        <NumberField label="Fixed charge (flat-rate tariff only)" suffix={`${s.currency}/month`} value={s.fixedCharge} min={0} step={1} onChange={(v) => updateSettings({ fixedCharge: Math.max(0, v) })} />
       </div>
       <TextArea label="Quotation note" rows={2} value={s.quoteNote} onChange={(v) => updateSettings({ quoteNote: v })} />
       <TextArea label="Payment details" rows={3} value={s.paymentDetails} onChange={(v) => updateSettings({ paymentDetails: v })} hint="Shown under the quote acceptance, e.g. bank account details." />

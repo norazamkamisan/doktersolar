@@ -50,8 +50,15 @@ export interface PvWattsResult {
 
 export interface EnergySettings {
   peakSunHours: number;
-  /** currency per kWh */
+  /** average rate, currency per kWh: used for the flat tariff, and as a fallback with no usage */
   tariff: number;
+  /**
+   * How bills are worked out: TNB Domestic General or ToU (tariff from 1 July 2025), or one flat
+   * rate. Left out: TNB Domestic, except projects from a non-residential TNB bill (flat).
+   */
+  tariffModel?: 'tnb' | 'tnb-tou' | 'flat';
+  /** Domestic ToU: share of use in the peak period, % */
+  touPeakPct?: number;
   /** currency per watt (installed) */
   pricePerWatt: number;
   /** degradation in the first year, % (older projects don't have it: see normalizeProject) */
@@ -150,8 +157,10 @@ export interface Settings {
   /** terms & conditions page; placeholders {customer} {address} {price} {deposit} {depositPct}. Empty = no page */
   terms: string;
   caseStudies: CaseStudy[];
-  /** fixed monthly charge on the electricity bill (stays after solar) */
+  /** fixed monthly charge on the electricity bill with the flat tariff (stays after solar) */
   fixedCharge: number;
+  /** TNB Automatic Fuel Adjustment, sen/kWh: changes monthly */
+  afaSen: number;
 }
 
 export interface CaseStudy {

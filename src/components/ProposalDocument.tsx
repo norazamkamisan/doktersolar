@@ -1,7 +1,20 @@
 import { forwardRef, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Car, House, Plane, TreeDeciduous, UtilityPole } from 'lucide-react';
 import type { Project, Settings } from '../types';
-import { billYear, compass, degradationText, energyFor, environmentFor, financialsFor, layoutPanels } from '../lib/solar';
+import {
+  TARIFF_LABEL,
+  billYear,
+  compass,
+  currentAfaSen,
+  degradationText,
+  energyFor,
+  environmentFor,
+  financialsFor,
+  layoutPanels,
+  tariffModelOf,
+  touPeakPctOf,
+} from '../lib/solar';
+import { TNB_2025 } from '../lib/tnbTariff';
 import { DEFAULT_SETTINGS } from '../lib/defaults';
 import { money, num } from '../lib/format';
 import { fillTerms, inverterLine, issuedAt, longDate, panelLine, paragraphs, quoteFor, quoteNumber, shortName, validUntil } from '../lib/proposal';
@@ -379,7 +392,40 @@ const ProposalDocument = forwardRef<HTMLElement, { project: Project; settings: D
     ),
   });
 
-  const tariffName = p.bill ? `${p.bill.tariff ? `${p.bill.tariff} — ` : ''}${CATEGORY_LABEL[p.bill.category]}` : 'Tenaga Nasional Berhad (TNB)';
+  const model = tariffModelOf(p);
+  const tariffLabel = TARIFF_LABEL[model];
+  const sen = (v: number) => `${num(v, 2)} sen / kWh`;
+  const tariffName =
+    model === 'flat'
+      ? p.bill
+        ? `${p.bill.tariff ? `${p.bill.tariff} — ` : ''}${CATEGORY_LABEL[p.bill.category]}`
+        : 'Flat rate'
+      : `Tenaga Nasional Berhad (TNB) ${tariffLabel.replace(/^TNB /, '')} (from ${TNB_2025.effectiveFrom})`;
+  const tariffRows: [string, string][] =
+    model === 'flat'
+      ? [
+          ['Energy Charge (average rate)', `${money(p.energy.tariff, cur, 3)} / kWh`],
+          ['Fixed Charge', `${money(s.fixedCharge, cur, 2)} / month`],
+        ]
+      : [
+          ...(model === 'tnb'
+            ? ([
+                ['Energy Charge, 1,500 kWh and below per month', sen(TNB_2025.energyLow)],
+                ['Energy Charge, above 1,500 kWh per month', sen(TNB_2025.energyHigh)],
+              ] as [string, string][])
+            : ([
+                ['Energy Charge, peak (2pm–10pm Mon–Fri), 1,500 kWh and below', sen(TNB_2025.touPeakLow)],
+                ['Energy Charge, off-peak, 1,500 kWh and below', sen(TNB_2025.touOffPeakLow)],
+                ['Energy Charge, peak, above 1,500 kWh', sen(TNB_2025.touPeakHigh)],
+                ['Energy Charge, off-peak, above 1,500 kWh', sen(TNB_2025.touOffPeakHigh)],
+                ['Share of use in the peak period (assumed)', `${num(touPeakPctOf(p))}%`],
+              ] as [string, string][])),
+          ['Capacity Charge', sen(TNB_2025.capacity)],
+          ['Network Charge', sen(TNB_2025.network)],
+          ['Retail Charge (waived at 800 kWh and below)', `${money(TNB_2025.retail, cur, 2)} / month`],
+          ['AFA (waived at 800 kWh and below)', `${num(currentAfaSen(), 2)} sen / kWh (changes monthly)`],
+          ['Energy Efficiency Incentive (1,000 kWh and below)', 'rebate of 0.5 – 25 sen / kWh, larger for lower use'],
+        ];
   const cumulativeBill: { year: number; value: number }[] = [];
   {
     let total = 0;
@@ -417,11 +463,11 @@ const ProposalDocument = forwardRef<HTMLElement, { project: Project; settings: D
                 {[
                   'Month',
                   'Solar Generation (kWh)',
-                  'Net Grid Consumption before new system (kWh)',
-                  'Net Grid Consumption after new system (kWh)',
+                  'Grid Consumption before new system (kWh)',
+                  'Grid Consumption after new system (kWh)',
                   `Utility Bill before new system (${cur === 'MYR' ? 'RM' : cur})`,
                   `Utility Bill after new system (${cur === 'MYR' ? 'RM' : cur})`,
-                  `Cumulative Energy Credit (${cur === 'MYR' ? 'RM' : cur})`,
+                  'Energy Credit carried forward (kWh)',
                   `Estimated Savings (${cur === 'MYR' ? 'RM' : cur})`,
                 ].map((h, i) => (
                   <th key={h} className={`px-1.5 py-2 font-semibold ${i ? 'text-right' : 'text-left'}`}>
@@ -436,10 +482,10 @@ const ProposalDocument = forwardRef<HTMLElement, { project: Project; settings: D
                   <td className="px-1.5 py-1">{m.month}</td>
                   <td className={cell}>{num(m.solarKwh)}</td>
                   <td className={cell}>{hasUse ? num(m.usageKwh) : '—'}</td>
-                  <td className={cell}>{hasUse ? (m.netKwh < 0 ? `(${num(-m.netKwh)})` : num(m.netKwh)) : '—'}</td>
+                  <td className={cell}>{hasUse ? num(m.gridAfterKwh) : '—'}</td>
                   <td className={cell}>{hasUse ? num(m.billBefore) : '—'}</td>
                   <td className={cell}>{hasUse ? num(m.billAfter) : '—'}</td>
-                  <td className={cell}>{num(m.credit)}</td>
+                  <td className={cell}>{hasUse ? num(m.creditKwh) : '—'}</td>
                   <td className={cell}>{num(m.savings)}</td>
                 </tr>
               ))}
@@ -451,27 +497,26 @@ const ProposalDocument = forwardRef<HTMLElement, { project: Project; settings: D
             Your projected energy cost is calculated by considering a {p.energy.escalation}% increase in energy cost each year. This estimate is based
             on your current energy costs and the position and orientation of your roof.{' '}
             {hasUse
-              ? `Projections are based on usage of ${num(energy.consumptionKwh)} kWh per year at ${money(p.energy.tariff, cur, 3)} per kWh.`
-              : 'No usage was given, so every kWh of solar is counted as a saving.'}{' '}
-            Solar beyond your own use is credited against later bills in the same year.
+              ? `Projections are based on usage of ${num(energy.consumptionKwh)} kWh per year (${num(energy.consumptionKwh / 12)} kWh per month), assuming the ${tariffLabel} tariff.`
+              : 'No usage was given, so every kWh of solar is counted as a saving at the average rate.'}{' '}
+            Solar beyond your own use is exported, and its kWh offset grid use in later months of the same year (net energy metering). Taxes
+            (SST, KWTBB) are not included.
           </p>
           <p>Your electricity tariff rates may change as a result of installing the system. You should contact your electricity retailer for further information.</p>
         </div>
-        <table className="mt-4 w-full border border-slate-200 text-xs text-slate-800">
+        <table className="mt-4 w-full border border-slate-200 text-[11px] text-slate-800">
           <tbody className="divide-y divide-slate-200">
             <tr className="bg-slate-100">
-              <td colSpan={2} className="px-3 py-2 font-semibold">
-                Tariff Details - {tariffName}
+              <td colSpan={2} className="px-3 py-1.5 font-semibold">
+                Proposed Tariff Details - {tariffName}
               </td>
             </tr>
-            <tr>
-              <td className="w-1/2 px-3 py-2 font-semibold">Energy Charge (average rate)</td>
-              <td className="px-3 py-2">{money(p.energy.tariff, cur, 3)} / kWh</td>
-            </tr>
-            <tr>
-              <td className="px-3 py-2 font-semibold">Fixed Charge</td>
-              <td className="px-3 py-2">{money(s.fixedCharge, cur, 2)} / month</td>
-            </tr>
+            {tariffRows.map(([k, v]) => (
+              <tr key={k}>
+                <td className="w-1/2 px-3 py-1 font-semibold">{k}</td>
+                <td className="px-3 py-1">{v}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>

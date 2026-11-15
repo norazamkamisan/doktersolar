@@ -4,13 +4,26 @@ import { CloudSun, Loader2 } from 'lucide-react';
 import type { Project } from '../../types';
 import { updateEnergy, useSettings } from '../../lib/store';
 import { fetchPvWatts } from '../../lib/api';
-import { MONTHS, PERFORMANCE_RATIO, degradationText, energyFor, financialsFor } from '../../lib/solar';
+import {
+  MONTHS,
+  PERFORMANCE_RATIO,
+  TARIFF_LABEL,
+  currentAfaSen,
+  degradationText,
+  energyFor,
+  financialsFor,
+  monthBill,
+  tariffModelOf,
+  touPeakPctOf,
+  type TariffModel,
+} from '../../lib/solar';
 import { money, num } from '../../lib/format';
 import { NumberField, StatCard } from '../../components/ui';
 import { CashflowChart, MonthlyProductionChart } from '../../components/Charts';
 
 export default function EnergyTab({ project: p }: { project: Project }) {
-  const { currency } = useSettings();
+  const settings = useSettings();
+  const { currency } = settings;
   const e = p.energy;
   const energy = energyFor(p);
   const fin = financialsFor(p, energy);
@@ -87,7 +100,49 @@ export default function EnergyTab({ project: p }: { project: Project }) {
         <section className="card space-y-4 p-5">
           <h3 className="font-semibold text-slate-900">Assumptions</h3>
           <NumberField label="Peak sun hours" suffix="h/day" value={e.peakSunHours} min={0} step={0.1} onChange={(v) => updateEnergy(p.id, { peakSunHours: v })} />
-          <NumberField label="Electricity tariff" suffix={`${currency}/kWh`} value={e.tariff} min={0} step={0.01} onChange={(v) => updateEnergy(p.id, { tariff: v })} />
+          <div>
+            <label className="label" htmlFor="tariff-model">
+              Electricity tariff
+            </label>
+            <select
+              id="tariff-model"
+              className="input"
+              value={tariffModelOf(p)}
+              onChange={(ev) => updateEnergy(p.id, { tariffModel: ev.target.value as TariffModel })}
+            >
+              {(Object.keys(TARIFF_LABEL) as TariffModel[]).map((m) => (
+                <option key={m} value={m}>
+                  {TARIFF_LABEL[m]}
+                  {m !== 'flat' ? ' (2025)' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+          {tariffModelOf(p) === 'tnb-tou' && (
+            <NumberField
+              label="Use in peak hours (2pm–10pm Mon–Fri)"
+              suffix="%"
+              value={touPeakPctOf(p)}
+              min={0}
+              step={5}
+              onChange={(v) => updateEnergy(p.id, { touPeakPct: Math.min(100, Math.max(0, v)) })}
+            />
+          )}
+          <NumberField
+            label={tariffModelOf(p) === 'flat' ? 'Average rate' : 'Average rate (used when no usage is given)'}
+            suffix={`${currency}/kWh`}
+            value={e.tariff}
+            min={0}
+            step={0.01}
+            onChange={(v) => updateEnergy(p.id, { tariff: v })}
+          />
+          {energy.consumptionKwh > 0 && (
+            <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
+              Usage {num(energy.consumptionKwh / 12)} kWh/month → bill about{' '}
+              <span className="font-medium text-slate-700">{money(monthBill(p, energy.consumptionKwh / 12, settings.fixedCharge), currency)}</span> a month
+              {tariffModelOf(p) !== 'flat' ? ` (AFA ${num(currentAfaSen(), 2)} sen/kWh, before taxes)` : ''}.
+            </p>
+          )}
           <NumberField label="Installed price" suffix={`${currency}/W`} value={e.pricePerWatt} min={0} step={0.05} onChange={(v) => updateEnergy(p.id, { pricePerWatt: v })} />
           <div className="grid grid-cols-2 gap-3">
             <NumberField
