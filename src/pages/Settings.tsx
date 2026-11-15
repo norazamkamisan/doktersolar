@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { ImagePlus, RotateCcw, Trash2 } from 'lucide-react';
 import { resetDemoData, updateSettings, useSettings } from '../lib/store';
+import { useSyncStatus } from '../lib/sync';
 import { CURRENCIES } from '../lib/format';
 import { Field, NumberField, PageHeader } from '../components/ui';
 import { BrandLogo } from '../components/Logo';
@@ -32,6 +33,7 @@ function fileToLogo(file: File): Promise<string> {
 
 export default function SettingsPage() {
   const s = useSettings();
+  const sync = useSyncStatus();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const onLogo = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -101,7 +103,8 @@ export default function SettingsPage() {
 
         <OpenSolarImportCard />
 
-        <section className="card flex flex-wrap items-center justify-between gap-4 p-5 sm:p-6">
+        {/* With shared Google Drive storage a reset would replace everyone's data, so it's only offered for browser-only data. */}
+        {sync.state === 'local' && <section className="card flex flex-wrap items-center justify-between gap-4 p-5 sm:p-6">
           <div>
             <h2 className="font-semibold text-slate-900">Demo data</h2>
             <p className="text-sm text-slate-500">Restore the 5 sample projects and default settings. Your changes will be lost.</p>
@@ -112,7 +115,7 @@ export default function SettingsPage() {
           >
             <RotateCcw className="h-4 w-4" /> Reset demo data
           </button>
-        </section>
+        </section>}
       </div>
     </div>
   );

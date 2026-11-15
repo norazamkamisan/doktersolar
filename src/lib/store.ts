@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react';
 import type { DesignSettings, EnergySettings, Project, Settings } from '../types';
 import { DEFAULT_SETTINGS, defaultDesign, defaultEnergy, withComputed } from './defaults';
 import { buildSeedProjects } from './seed';
+import { noteProjectChanges, noteSettingsChange, startSync } from './sync';
 
 export { DEFAULT_SETTINGS };
 
@@ -48,9 +49,22 @@ window.addEventListener('storage', (e) => {
   emit();
 });
 
+/** Record which projects changed or were removed, for syncing to the shared copy. */
+function noteDiff(prev: Project[], next: Project[]) {
+  const before = new Map(prev.map((p) => [p.id, p]));
+  const changed: string[] = [];
+  for (const p of next) {
+    if (before.get(p.id) !== p) changed.push(p.id);
+    before.delete(p.id);
+  }
+  noteProjectChanges(changed, [...before.keys()]);
+}
+
 function commitProjects(next: Project[]) {
+  const prev = projects;
   projects = next;
   write(PROJECTS_KEY, projects);
+  noteDiff(prev, next);
   emit();
 }
 
@@ -129,6 +143,7 @@ export function deleteProject(id: string): void {
 export function updateSettings(patch: Partial<Settings>): void {
   settings = { ...settings, ...patch };
   write(SETTINGS_KEY, settings);
+  noteSettingsChange();
   emit();
 }
 
@@ -147,7 +162,9 @@ export function importProjects(incoming: Project[], options: { removeDemo?: bool
   } catch {
     throw new Error('Not enough browser storage for this import. Remove some projects or the company logo and try again.');
   }
+  const prev = projects;
   projects = next;
+  noteDiff(prev, next);
   emit();
   return { added: incoming.length - updated, updated };
 }
@@ -162,5 +179,21 @@ export function removeProjectsWithPrefix(prefix: string): number {
 export function resetDemoData(): void {
   settings = { ...DEFAULT_SETTINGS };
   write(SETTINGS_KEY, settings);
+  noteSettingsChange();
   commitProjects(buildSeedProjects(settings));
 }
+
+// Keep in step with the shared copy in Google Drive, where the site has it set up (see lib/sync.ts).
+startSync({
+  getProjects: () => projects,
+  getSettings: () => settings,
+  apply(nextProjects, nextSettings) {
+    projects = nextProjects;
+    write(PROJECTS_KEY, projects);
+    if (nextSettings) {
+      settings = { ...DEFAULT_SETTINGS, ...nextSettings };
+      write(SETTINGS_KEY, settings);
+    }
+    emit();
+  },
+});

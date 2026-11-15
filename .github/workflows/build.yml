@@ -44,6 +44,7 @@ jobs:
         run: |
           node --check server/pvwatts-core.mjs
           node -e "import('./api/pvwatts.js').then(m => { if (typeof m.GET !== 'function') process.exit(1) })"
+          node -e "import('./api/data.js').then(m => { if (typeof m.GET !== 'function' || typeof m.POST !== 'function') process.exit(1) })"
           node -e "import('./netlify/functions/pvwatts.mjs').then(m => { if (typeof m.default !== 'function') process.exit(1) })"
 
       - name: Upload build output

@@ -13,3 +13,7 @@ dist
 
 # Customer bills / documents: never commit
 *.pdf
+
+# Google service account keys and the Drive data file: never commit
+doktersolar-*.json
+*service-account*.json

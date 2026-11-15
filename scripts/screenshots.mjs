@@ -12,8 +12,8 @@
 // PVWatts data is fetched through the site's own /api/pvwatts endpoint (one request),
 // so it only works where that function has NREL_API_KEY configured.
 //
-// If the site is password-protected, set SITE_PASSWORD in your environment first
-// (PowerShell: $env:SITE_PASSWORD = '...'). It is only sent to the site's /api/login.
+// If the site is password-protected, the script asks for the password (typing is hidden),
+// or reads SITE_PASSWORD from the environment. It is only sent to the site's /api/login.
 
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -141,6 +141,34 @@ const SHOTS = [
   { name: 'mobile', path: '/home', width: 390, height: 844, mobile: true, scale: 2 },
 ];
 
+/** Read a line from the terminal without echoing it. */
+function askHidden(prompt) {
+  if (!process.stdin.isTTY) return Promise.resolve('');
+  return new Promise((resolve) => {
+    process.stdout.write(prompt);
+    const stdin = process.stdin;
+    stdin.setRawMode(true);
+    stdin.resume();
+    stdin.setEncoding('utf8');
+    let value = '';
+    const onData = (chunk) => {
+      for (const ch of chunk) {
+        if (ch === '\r' || ch === '\n') {
+          stdin.setRawMode(false);
+          stdin.pause();
+          stdin.off('data', onData);
+          process.stdout.write('\n');
+          return resolve(value);
+        }
+        if (ch === '\u0003') process.exit(130); // Ctrl-C
+        if (ch === '\u0008' || ch === '\u007f') value = value.slice(0, -1);
+        else value += ch;
+      }
+    };
+    stdin.on('data', onData);
+  });
+}
+
 async function main() {
   mkdirSync(OUT_DIR, { recursive: true });
   console.log(`Site:   ${SITE}`);
@@ -186,8 +214,8 @@ async function main() {
 
     // Password-protected site (middleware.js): sign in with SITE_PASSWORD from the environment.
     if ((await evaluate('location.pathname')) === '/login') {
-      const password = process.env.SITE_PASSWORD;
-      if (!password) throw new Error('The site is password-protected. Set SITE_PASSWORD in your environment and re-run.');
+      const password = process.env.SITE_PASSWORD || (await askHidden('Site password (typing is hidden): '));
+      if (!password) throw new Error('The site is password-protected. Enter the password, or set SITE_PASSWORD, and re-run.');
       const ok = await evaluate(`(async () => {
         const res = await fetch('/api/login', { method: 'POST', body: new URLSearchParams({ password: ${JSON.stringify(password)}, next: '/home' }) });
         return new URL(res.url).pathname === '/home';
