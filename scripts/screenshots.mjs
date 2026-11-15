@@ -14,6 +14,10 @@
 //
 // If the site is password-protected, the script asks for the password (typing is hidden),
 // or reads SITE_PASSWORD from the environment. It is only sent to the site's /api/login.
+//
+// The screenshot browser never touches the shared Google Drive data: /api/data is answered
+// locally with "not configured", so only the 5 demo projects are shown (and nothing is saved
+// to Drive). The script stops if any non-demo project shows up.
 
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -126,7 +130,8 @@ async function connect(wsUrl) {
       const l = { method, resolve: (m) => (listeners.splice(listeners.indexOf(l), 1), res(m)) };
       listeners.push(l);
     });
-  return { send, once, close: () => ws.close() };
+  const on = (method, fn) => listeners.push({ method, resolve: fn });
+  return { send, once, on, close: () => ws.close() };
 }
 
 /* ------------------------------------------------------------------ */
@@ -141,7 +146,7 @@ const SHOTS = [
   { name: 'mobile', path: '/home', width: 390, height: 844, mobile: true, scale: 2 },
 ];
 
-/** Read a line from the terminal without echoing it. */
+/** Read a line from the terminal, showing * instead of the characters. */
 function askHidden(prompt) {
   if (!process.stdin.isTTY) return Promise.resolve('');
   return new Promise((resolve) => {
@@ -161,8 +166,13 @@ function askHidden(prompt) {
           return resolve(value);
         }
         if (ch === '\u0003') process.exit(130); // Ctrl-C
-        if (ch === '\u0008' || ch === '\u007f') value = value.slice(0, -1);
-        else value += ch;
+        if (ch === '\u0008' || ch === '\u007f') {
+          if (value) process.stdout.write('\b \b');
+          value = value.slice(0, -1);
+        } else if (ch >= ' ') {
+          value += ch;
+          process.stdout.write('*'); // a star per key, never the key itself
+        }
       }
     };
     stdin.on('data', onData);
@@ -203,10 +213,25 @@ async function main() {
       await sleep(250);
     }
     await sleep(800); // let charts and fonts finish painting
+    // false when the browser shows its own error page (e.g. the connection dropped)
+    return evaluate(`location.origin === ${JSON.stringify(new URL(SITE).origin)} && !!document.querySelector('main, article')`);
   };
 
   try {
     await cdp.send('Page.enable');
+    // Keep real customer data out of the screenshots: pretend Drive storage isn't set up.
+    cdp.on('Fetch.requestPaused', ({ params }) =>
+      cdp.send('Fetch.fulfillRequest', {
+        requestId: params.requestId,
+        responseCode: 200,
+        responseHeaders: [
+          { name: 'Content-Type', value: 'application/json' },
+          { name: 'Cache-Control', value: 'no-store' },
+        ],
+        body: Buffer.from(JSON.stringify({ configured: false })).toString('base64'),
+      }).catch(() => {}),
+    );
+    await cdp.send('Fetch.enable', { patterns: [{ urlPattern: '*/api/data*' }] });
     await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
 
     // A fresh profile, so the first visit seeds the 5 demo projects.
@@ -214,7 +239,7 @@ async function main() {
 
     // Password-protected site (middleware.js): sign in with SITE_PASSWORD from the environment.
     if ((await evaluate('location.pathname')) === '/login') {
-      const password = process.env.SITE_PASSWORD || (await askHidden('Site password (typing is hidden): '));
+      const password = process.env.SITE_PASSWORD || (await askHidden('Site password (shows * as you type): '));
       if (!password) throw new Error('The site is password-protected. Enter the password, or set SITE_PASSWORD, and re-run.');
       const ok = await evaluate(`(async () => {
         const res = await fetch('/api/login', { method: 'POST', body: new URLSearchParams({ password: ${JSON.stringify(password)}, next: '/home' }) });
@@ -225,6 +250,11 @@ async function main() {
       await goto('/home');
     }
     await settle(false);
+
+    const ids = await evaluate(`JSON.parse(localStorage.getItem('doktersolar.projects.v1') || '[]').map((p) => p.id)`);
+    if (!ids.length || ids.some((id) => !id.startsWith('demo-'))) {
+      throw new Error('Stopped: the screenshot browser has non-demo projects, which must not go in the README.');
+    }
 
     if (WITH_PVWATTS) {
       // Same steps as the "Get PVWatts estimate" button: fetch, then store on the project.
@@ -257,8 +287,16 @@ async function main() {
         deviceScaleFactor: s.scale ?? 1,
         mobile: !!s.mobile,
       });
-      await goto(s.path);
-      await settle(!!s.map);
+      let loaded = false;
+      for (let attempt = 1; attempt <= 3 && !loaded; attempt++) {
+        if (attempt > 1) {
+          console.warn(`  ! ${s.name}: page did not load, retrying (${attempt}/3)`);
+          await sleep(3000);
+        }
+        await goto(s.path);
+        loaded = await settle(!!s.map);
+      }
+      if (!loaded) throw new Error(`${s.name}: the page did not load (check your internet connection). Nothing was saved for it.`);
       const { data } = await cdp.send('Page.captureScreenshot', { format: 'png' });
       writeFileSync(join(OUT_DIR, `${s.name}.png`), Buffer.from(data, 'base64'));
       console.log(`  ✓ ${s.name}.png`);
