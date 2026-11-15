@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import type { DesignSettings, EnergySettings, Project, Settings } from '../types';
-import { DEFAULT_SETTINGS, defaultDesign, defaultEnergy, withComputed } from './defaults';
+import { DEFAULT_SETTINGS, defaultDesign, defaultEnergy, normalizeProject, withComputed } from './defaults';
 import { buildSeedProjects } from './seed';
 import { noteProjectChanges, noteSettingsChange, startSync } from './sync';
 
@@ -32,7 +32,8 @@ function write(key: string, value: unknown): void {
 }
 
 let settings: Settings = { ...DEFAULT_SETTINGS, ...(read<Partial<Settings>>(SETTINGS_KEY) ?? {}) };
-let projects: Project[] = read<Project[]>(PROJECTS_KEY) ?? buildSeedProjects(settings);
+const normalize = (list: Project[]) => list.map(normalizeProject);
+let projects: Project[] = normalize(read<Project[]>(PROJECTS_KEY) ?? buildSeedProjects(settings));
 if (!localStorage.getItem(PROJECTS_KEY)) write(PROJECTS_KEY, projects);
 
 const listeners = new Set<() => void>();
@@ -44,7 +45,7 @@ const subscribe = (l: () => void) => {
 
 // keep multiple tabs in sync
 window.addEventListener('storage', (e) => {
-  if (e.key === PROJECTS_KEY) projects = read<Project[]>(PROJECTS_KEY) ?? [];
+  if (e.key === PROJECTS_KEY) projects = normalize(read<Project[]>(PROJECTS_KEY) ?? []);
   if (e.key === SETTINGS_KEY) settings = { ...DEFAULT_SETTINGS, ...(read<Partial<Settings>>(SETTINGS_KEY) ?? {}) };
   emit();
 });
@@ -156,7 +157,7 @@ export function importProjects(incoming: Project[], options: { removeDemo?: bool
   const incomingIds = new Set(incoming.map((p) => p.id));
   const kept = projects.filter((p) => !incomingIds.has(p.id) && !(options.removeDemo && p.id.startsWith('demo-')));
   const updated = projects.filter((p) => incomingIds.has(p.id)).length;
-  const next = [...incoming, ...kept].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const next = [...normalize(incoming), ...kept].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   try {
     localStorage.setItem(PROJECTS_KEY, JSON.stringify(next));
   } catch {
@@ -188,7 +189,7 @@ startSync({
   getProjects: () => projects,
   getSettings: () => settings,
   apply(nextProjects, nextSettings) {
-    projects = nextProjects;
+    projects = normalize(nextProjects);
     write(PROJECTS_KEY, projects);
     if (nextSettings) {
       settings = { ...DEFAULT_SETTINGS, ...nextSettings };

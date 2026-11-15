@@ -54,7 +54,9 @@ export interface EnergySettings {
   tariff: number;
   /** currency per watt (installed) */
   pricePerWatt: number;
-  /** annual degradation, % */
+  /** degradation in the first year, % (older projects don't have it: see normalizeProject) */
+  firstYearDegradation?: number;
+  /** degradation per year from the second year on, % */
   degradation: number;
   /** annual tariff escalation, % */
   escalation: number;
@@ -107,6 +109,17 @@ export interface Settings {
   companyPhone: string;
   logo: string | null;
   defaultPanelWattage: number;
+  /** default panel size for new projects, metres */
+  defaultPanelWidth: number;
+  defaultPanelLength: number;
+  /** default degradation for new projects, % (first year, then per year) */
+  firstYearDegradation: number;
+  degradation: number;
+  /** shown on proposals */
+  panelWarrantyYears: number;
+  performanceWarrantyYears: number;
+  inverter: string;
+  inverterWarrantyYears: number;
   pricePerWatt: number;
   tariff: number;
   currency: string;

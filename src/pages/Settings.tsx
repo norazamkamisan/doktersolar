@@ -98,6 +98,49 @@ export default function SettingsPage() {
             <NumberField label="Price per watt (installed)" suffix={`${s.currency}/W`} value={s.pricePerWatt} min={0} step={0.05} onChange={(v) => updateSettings({ pricePerWatt: v })} />
             <NumberField label="Electricity tariff" suffix={`${s.currency}/kWh`} value={s.tariff} min={0} step={0.01} onChange={(v) => updateSettings({ tariff: v })} />
             <NumberField label="Peak sun hours" suffix="h/day" value={s.peakSunHours} min={0} step={0.1} onChange={(v) => updateSettings({ peakSunHours: v })} />
+            <NumberField label="Panel length" suffix="m" value={s.defaultPanelLength} min={0.3} step={0.001} onChange={(v) => updateSettings({ defaultPanelLength: v })} />
+            <NumberField label="Panel width" suffix="m" value={s.defaultPanelWidth} min={0.3} step={0.001} onChange={(v) => updateSettings({ defaultPanelWidth: v })} />
+            <NumberField
+              label="Degradation, year 1"
+              suffix="%"
+              value={s.firstYearDegradation}
+              min={0}
+              step={0.1}
+              onChange={(v) => updateSettings({ firstYearDegradation: v })}
+            />
+            <NumberField label="Degradation, then per year" suffix="%/yr" value={s.degradation} min={0} step={0.01} onChange={(v) => updateSettings({ degradation: v })} />
+          </div>
+        </section>
+
+        <section className="card p-5 sm:p-6">
+          <h2 className="font-semibold text-slate-900">Equipment & warranties</h2>
+          <p className="mb-5 text-sm text-slate-500">Shown in the system details of every proposal.</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <NumberField
+              label="Panel product warranty"
+              suffix="years"
+              value={s.panelWarrantyYears}
+              min={0}
+              step={1}
+              onChange={(v) => updateSettings({ panelWarrantyYears: Math.max(0, Math.round(v)) })}
+            />
+            <NumberField
+              label="Panel performance warranty"
+              suffix="years"
+              value={s.performanceWarrantyYears}
+              min={0}
+              step={1}
+              onChange={(v) => updateSettings({ performanceWarrantyYears: Math.max(0, Math.round(v)) })}
+            />
+            <Field label="Inverter" value={s.inverter} onChange={(e) => updateSettings({ inverter: e.target.value })} />
+            <NumberField
+              label="Inverter product warranty"
+              suffix="years"
+              value={s.inverterWarrantyYears}
+              min={0}
+              step={1}
+              onChange={(v) => updateSettings({ inverterWarrantyYears: Math.max(0, Math.round(v)) })}
+            />
           </div>
         </section>
 

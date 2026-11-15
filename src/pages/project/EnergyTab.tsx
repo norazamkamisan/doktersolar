@@ -4,7 +4,7 @@ import { CloudSun, Loader2 } from 'lucide-react';
 import type { Project } from '../../types';
 import { updateEnergy, useSettings } from '../../lib/store';
 import { fetchPvWatts } from '../../lib/api';
-import { MONTHS, PERFORMANCE_RATIO, energyFor, financialsFor } from '../../lib/solar';
+import { MONTHS, PERFORMANCE_RATIO, degradationText, energyFor, financialsFor } from '../../lib/solar';
 import { money, num } from '../../lib/format';
 import { NumberField, StatCard } from '../../components/ui';
 import { CashflowChart, MonthlyProductionChart } from '../../components/Charts';
@@ -50,7 +50,7 @@ export default function EnergyTab({ project: p }: { project: Project }) {
           <StatCard label="Annual production" value={`${num(energy.annualKwh)} kWh`} hint={energy.source === 'pvwatts' ? 'PVWatts (NLR)' : 'Simple estimate'} />
           <StatCard
             label="Bill offset"
-            value={energy.consumptionKwh > 0 ? `${num(energy.offsetPct)}%` : '—'}
+            value={energy.consumptionKwh > 0 ? `${num(energy.offsetPct)}%` : 'â€”'}
             hint={energy.consumptionKwh > 0 ? `of ~${num(energy.consumptionKwh)} kWh/yr usage` : 'Add the monthly bill on the Info tab'}
           />
           <StatCard label="Payback" value={fin.paybackYears ? `${num(fin.paybackYears, 1)} yrs` : '> 25 yrs'} hint={`System cost ${money(fin.systemCost, currency)}`} />
@@ -77,7 +77,7 @@ export default function EnergyTab({ project: p }: { project: Project }) {
         <section className="card p-5">
           <h3 className="font-semibold text-slate-900">Cumulative savings</h3>
           <p className="mb-4 text-xs text-slate-500">
-            Net position after system cost, with {e.degradation}% annual degradation and {e.escalation}% tariff escalation
+            Net position after system cost, with panel degradation of {degradationText(e)} and {e.escalation}% tariff escalation
           </p>
           <CashflowChart data={fin.cashflow} currency={currency} />
         </section>
@@ -90,11 +90,19 @@ export default function EnergyTab({ project: p }: { project: Project }) {
           <NumberField label="Electricity tariff" suffix={`${currency}/kWh`} value={e.tariff} min={0} step={0.01} onChange={(v) => updateEnergy(p.id, { tariff: v })} />
           <NumberField label="Installed price" suffix={`${currency}/W`} value={e.pricePerWatt} min={0} step={0.05} onChange={(v) => updateEnergy(p.id, { pricePerWatt: v })} />
           <div className="grid grid-cols-2 gap-3">
-            <NumberField label="Degradation" suffix="%/yr" value={e.degradation} min={0} step={0.1} onChange={(v) => updateEnergy(p.id, { degradation: v })} />
+            <NumberField
+              label="Degradation, year 1"
+              suffix="%"
+              value={e.firstYearDegradation ?? e.degradation}
+              min={0}
+              step={0.1}
+              onChange={(v) => updateEnergy(p.id, { firstYearDegradation: v })}
+            />
+            <NumberField label="Then per year" suffix="%/yr" value={e.degradation} min={0} step={0.01} onChange={(v) => updateEnergy(p.id, { degradation: v })} />
             <NumberField label="Tariff rise" suffix="%/yr" value={e.escalation} min={0} step={0.1} onChange={(v) => updateEnergy(p.id, { escalation: v })} />
           </div>
           <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
-            Simple model: {num(p.systemKw, 2)} kWp × {e.peakSunHours} h × 365 × {PERFORMANCE_RATIO} ={' '}
+            Simple model: {num(p.systemKw, 2)} kWp Ã— {e.peakSunHours} h Ã— 365 Ã— {PERFORMANCE_RATIO} ={' '}
             <span className="font-medium text-slate-700">{num(p.systemKw * e.peakSunHours * 365 * PERFORMANCE_RATIO)} kWh/yr</span>
           </p>
         </section>
@@ -116,7 +124,7 @@ export default function EnergyTab({ project: p }: { project: Project }) {
             <label className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 p-3 text-sm">
               <span>
                 Use PVWatts ({num(e.pvwatts.annual)} kWh/yr)
-                <span className="block text-xs text-slate-500">Size may have changed since fetch — refresh to update.</span>
+                <span className="block text-xs text-slate-500">Size may have changed since fetch â€” refresh to update.</span>
               </span>
               <input
                 type="checkbox"
