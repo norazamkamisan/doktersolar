@@ -267,6 +267,21 @@ export function recommendedKw(p: Pick<Project, 'monthlyBill' | 'monthlyKwh' | 'e
   return (annualUsageKwh(p) * share) / (p.energy.peakSunHours * 365 * PERFORMANCE_RATIO);
 }
 
+/**
+ * Share of the original output a panel still gives in year `y` (1 = first year), as panel
+ * warranties state it: the first-year loss, then a fixed loss each further year.
+ */
+export function outputFactor(e: Pick<Project['energy'], 'firstYearDegradation' | 'degradation'>, y: number): number {
+  const first = e.firstYearDegradation ?? e.degradation;
+  return Math.max(0, 1 - first / 100 - (e.degradation / 100) * (y - 1));
+}
+
+/** "1% in the first year, then 0.42% per year" */
+export function degradationText(e: Pick<Project['energy'], 'firstYearDegradation' | 'degradation'>): string {
+  const first = e.firstYearDegradation ?? e.degradation;
+  return first === e.degradation ? `${first}% per year` : `${first}% in the first year, then ${e.degradation}% per year`;
+}
+
 export interface Financials {
   systemCost: number;
   firstYearSavings: number;
@@ -285,7 +300,7 @@ export function financialsFor(p: Project, annualKwh: number): Financials {
   let paybackYears: number | null = null;
   const cashflow = [{ year: 0, cumulative, savings: 0 }];
   for (let y = 1; y <= 25; y++) {
-    const prod = annualKwh * Math.pow(1 - e.degradation / 100, y - 1);
+    const prod = annualKwh * outputFactor(e, y);
     const tariff = e.tariff * Math.pow(1 + e.escalation / 100, y - 1);
     const savings = prod * tariff;
     const before = cumulative;

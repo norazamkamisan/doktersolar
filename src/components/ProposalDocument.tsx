@@ -1,6 +1,7 @@
 import { forwardRef, useMemo } from 'react';
 import type { Project, Settings } from '../types';
-import { MONTHS, compass, energyFor, financialsFor, layoutPanels } from '../lib/solar';
+import { MONTHS, compass, degradationText, energyFor, financialsFor, layoutPanels } from '../lib/solar';
+import { DEFAULT_SETTINGS } from '../lib/defaults';
 import { date, money, num } from '../lib/format';
 import SolarMap from './SolarMap';
 import { LogoMark } from './Logo';
@@ -102,6 +103,8 @@ const ProposalDocument = forwardRef<HTMLElement, { project: Project; settings: D
   const issued = p.proposalSentAt ?? p.updatedAt;
   const validUntil = new Date(new Date(issued).getTime() + 30 * 86400000).toISOString();
   const center = p.lat != null && p.lng != null ? ([p.lat, p.lng] as [number, number]) : null;
+  // share links made before these settings existed don't carry them
+  const spec = { ...DEFAULT_SETTINGS, ...s };
 
   return (
     <article
@@ -206,18 +209,27 @@ const ProposalDocument = forwardRef<HTMLElement, { project: Project; settings: D
           <table className="w-full text-sm">
             <tbody className="divide-y divide-slate-100">
               {[
-                ['Solar panels', `${p.panelCount} × ${p.design.panelWattage} W (${p.design.panelWidth} × ${p.design.panelHeight} m, ${p.design.orientation})`],
+                [
+                  'Solar panels',
+                  `${p.panelCount} × ${p.design.panelWattage} W (${Math.max(p.design.panelWidth, p.design.panelHeight)} × ${Math.min(p.design.panelWidth, p.design.panelHeight)} m, ${p.design.orientation})`,
+                ],
+                [
+                  'Panel warranty',
+                  `${spec.panelWarrantyYears}-year product warranty, ${spec.performanceWarrantyYears}-year performance warranty`,
+                ],
+                ['Inverter', `${spec.inverter}, ${spec.inverterWarrantyYears}-year product warranty`],
                 layout.faces.length > 1
                   ? [
                       'Roof faces',
-                      layout.faces.map((f) => `${f.panels.length} panels facing ${compass(f.azimuth)} (${f.azimuth}°), ${f.tilt}° tilt`).join('; '),
+                      layout.faces
+                        .map((f) => `${f.panels.length} ${f.panels.length === 1 ? 'panel' : 'panels'} facing ${compass(f.azimuth)} (${f.azimuth}°), ${f.tilt}° tilt`)
+                        .join('; '),
                     ]
                   : ['Tilt / azimuth', `${p.design.tilt}° / ${p.design.azimuth}°`],
                 ['Production model', energy.source === 'pvwatts' ? 'PVWatts v8 by NLR (location weather data)' : `${p.energy.peakSunHours} peak sun hours × 365 × 0.8 performance ratio`],
                 ['Electricity tariff', `${money(p.energy.tariff, s.currency, 3)} per kWh, rising ${p.energy.escalation}% per year`],
-                ['Panel degradation', `${p.energy.degradation}% per year`],
+                ['Panel degradation', degradationText(p.energy)],
                 ['Current monthly bill', money(p.monthlyBill, s.currency)],
-                ['Installed price', `${money(p.energy.pricePerWatt, s.currency, 2)} per watt`],
               ].map(([k, v]) => (
                 <tr key={k}>
                   <td className="w-1/3 bg-slate-50 px-4 py-2.5 font-medium text-slate-600">{k}</td>
