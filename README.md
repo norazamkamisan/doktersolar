@@ -126,11 +126,7 @@ This captures all five images in `docs/screenshots/` from the live site using he
 - `npm run screenshots -- --site http://localhost:4173` captures a local `npm run preview` build. PVWatts falls back to the simple estimate there.
 - Set `BROWSER_PATH` to use a specific Chromium-based browser.
 
-If the site is password-protected, set the password in your terminal first so the script can sign in. It's only sent to the site's `/api/login`:
-
-```powershell
-$env:SITE_PASSWORD = 'your-password'
-```
+If the site is password-protected, the script asks for the password when it starts (typing is hidden). It's only sent to the site's `/api/login`. You can also set `SITE_PASSWORD` in the environment instead.
 
 Each run adds a few page views to Vercel Analytics.
 
