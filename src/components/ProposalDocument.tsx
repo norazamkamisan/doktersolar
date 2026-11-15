@@ -23,6 +23,7 @@ import { fillTerms, inverterLine, issuedAt, longDate, panelLine, paragraphs, quo
 import { CATEGORY_LABEL } from '../lib/billAnalysis';
 import SolarMap from './SolarMap';
 import environmentPhoto from '../assets/environment.jpg';
+import coverPhoto from '../assets/cover.jpg';
 import { LogoMark } from './Logo';
 import { AnnualSavingsChart, BillCompareChart, CumulativeBillSavingsChart, CumulativeNetChart, DailyGenUseChart, GREEN } from './ProposalCharts';
 
@@ -189,14 +190,7 @@ const ProposalDocument = forwardRef<HTMLElement, { project: Project; settings: D
           </div>
         </div>
         <div className="mx-auto mt-8 w-full overflow-hidden" style={{ maxWidth: 680 }}>
-          {s.coverImage ? (
-            <img src={s.coverImage} alt="" className="h-[280px] w-full object-cover" />
-          ) : (
-            <div className="relative h-[280px] w-full overflow-hidden" style={{ background: 'linear-gradient(135deg,#0f3d5e 0%,#1e6fa3 55%,#8fd3ff 100%)' }}>
-              <div className="absolute right-10 top-8 h-24 w-24 rounded-full bg-amber-300 opacity-90 blur-[2px]" />
-              <div className="absolute inset-x-0 bottom-0 h-32" style={{ background: 'repeating-linear-gradient(100deg,#123a5c 0 34px,#1d4f7a 34px 36px)', transform: 'skewY(-6deg) translateY(30px)' }} />
-            </div>
-          )}
+          <img src={s.coverImage || coverPhoto} alt="" className={`w-full object-cover ${r("h-[180px] sm:h-[280px]", "h-[280px]")}`} />
         </div>
         <h1 className="mt-6 text-center text-2xl font-light text-slate-800">Solar Energy System Proposal</h1>
         <div className="mt-6 space-y-4 text-sm text-slate-800">
