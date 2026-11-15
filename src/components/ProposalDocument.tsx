@@ -11,10 +11,12 @@ import {
   environmentFor,
   financialsFor,
   layoutPanels,
+  maxDemandOf,
   tariffModelOf,
+  tnbIdOf,
   touPeakPctOf,
 } from '../lib/solar';
-import { TNB_2025 } from '../lib/tnbTariff';
+import { TNB_2025, tnbTariffRows } from '../lib/tnbTariff';
 import { DEFAULT_SETTINGS } from '../lib/defaults';
 import { money, num } from '../lib/format';
 import { fillTerms, inverterLine, issuedAt, longDate, panelLine, paragraphs, quoteFor, quoteNumber, shortName, validUntil } from '../lib/proposal';
@@ -394,38 +396,19 @@ const ProposalDocument = forwardRef<HTMLElement, { project: Project; settings: D
 
   const model = tariffModelOf(p);
   const tariffLabel = TARIFF_LABEL[model];
-  const sen = (v: number) => `${num(v, 2)} sen / kWh`;
   const tariffName =
     model === 'flat'
       ? p.bill
         ? `${p.bill.tariff ? `${p.bill.tariff} — ` : ''}${CATEGORY_LABEL[p.bill.category]}`
         : 'Flat rate'
       : `Tenaga Nasional Berhad (TNB) ${tariffLabel.replace(/^TNB /, '')} (from ${TNB_2025.effectiveFrom})`;
-  const tariffRows: [string, string][] =
-    model === 'flat'
-      ? [
-          ['Energy Charge (average rate)', `${money(p.energy.tariff, cur, 3)} / kWh`],
-          ['Fixed Charge', `${money(s.fixedCharge, cur, 2)} / month`],
-        ]
-      : [
-          ...(model === 'tnb'
-            ? ([
-                ['Energy Charge, 1,500 kWh and below per month', sen(TNB_2025.energyLow)],
-                ['Energy Charge, above 1,500 kWh per month', sen(TNB_2025.energyHigh)],
-              ] as [string, string][])
-            : ([
-                ['Energy Charge, peak (2pm–10pm Mon–Fri), 1,500 kWh and below', sen(TNB_2025.touPeakLow)],
-                ['Energy Charge, off-peak, 1,500 kWh and below', sen(TNB_2025.touOffPeakLow)],
-                ['Energy Charge, peak, above 1,500 kWh', sen(TNB_2025.touPeakHigh)],
-                ['Energy Charge, off-peak, above 1,500 kWh', sen(TNB_2025.touOffPeakHigh)],
-                ['Share of use in the peak period (assumed)', `${num(touPeakPctOf(p))}%`],
-              ] as [string, string][])),
-          ['Capacity Charge', sen(TNB_2025.capacity)],
-          ['Network Charge', sen(TNB_2025.network)],
-          ['Retail Charge (waived at 800 kWh and below)', `${money(TNB_2025.retail, cur, 2)} / month`],
-          ['AFA (waived at 800 kWh and below)', `${num(currentAfaSen(), 2)} sen / kWh (changes monthly)`],
-          ['Energy Efficiency Incentive (1,000 kWh and below)', 'rebate of 0.5 – 25 sen / kWh, larger for lower use'],
-        ];
+  const tnbId = tnbIdOf(model);
+  const tariffRows: [string, string][] = tnbId
+    ? tnbTariffRows(tnbId, { touPeakPct: touPeakPctOf(p), afaSen: currentAfaSen(), maxDemandKw: maxDemandOf(p) })
+    : [
+        ['Energy Charge (average rate)', `${money(p.energy.tariff, cur, 3)} / kWh`],
+        ['Fixed Charge', `${money(s.fixedCharge, cur, 2)} / month`],
+      ];
   const cumulativeBill: { year: number; value: number }[] = [];
   {
     let total = 0;

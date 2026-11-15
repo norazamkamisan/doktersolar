@@ -13,8 +13,11 @@ import {
   energyFor,
   financialsFor,
   monthBill,
+  isTouModel,
+  maxDemandOf,
   tariffModelOf,
   touPeakPctOf,
+  usesMaxDemandModel,
   type TariffModel,
 } from '../../lib/solar';
 import { money, num } from '../../lib/format';
@@ -110,15 +113,38 @@ export default function EnergyTab({ project: p }: { project: Project }) {
               value={tariffModelOf(p)}
               onChange={(ev) => updateEnergy(p.id, { tariffModel: ev.target.value as TariffModel })}
             >
-              {(Object.keys(TARIFF_LABEL) as TariffModel[]).map((m) => (
-                <option key={m} value={m}>
-                  {TARIFF_LABEL[m]}
-                  {m !== 'flat' ? ' (2025)' : ''}
-                </option>
+              {[
+                ['Domestic (homes)', ['tnb', 'tnb-tou']],
+                ['Non-Domestic (shops, offices, factories)', ['lv', 'lv-tou', 'mv', 'mv-tou', 'hv', 'hv-tou']],
+                ['Other', ['flat']],
+              ].map(([group, models]) => (
+                <optgroup key={group as string} label={group as string}>
+                  {(models as TariffModel[]).map((m) => (
+                    <option key={m} value={m}>
+                      {TARIFF_LABEL[m]}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>
-          {tariffModelOf(p) === 'tnb-tou' && (
+          {usesMaxDemandModel(tariffModelOf(p)) && (
+            <div>
+              <NumberField
+                label="Maximum demand"
+                suffix="kW"
+                value={maxDemandOf(p)}
+                min={0}
+                step={1}
+                onChange={(v) => updateEnergy(p.id, { maxDemandKw: Math.max(0, v) })}
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                From the TNB bill. Capacity and network charges are per kW of maximum demand{isTouModel(tariffModelOf(p)) ? ' in the peak period' : ''}, assumed
+                unchanged with solar.
+              </p>
+            </div>
+          )}
+          {isTouModel(tariffModelOf(p)) && (
             <NumberField
               label="Use in peak hours (2pm–10pm Mon–Fri)"
               suffix="%"
@@ -136,6 +162,12 @@ export default function EnergyTab({ project: p }: { project: Project }) {
             step={0.01}
             onChange={(v) => updateEnergy(p.id, { tariff: v })}
           />
+          {energy.consumptionKwh <= 0 && p.monthlyBill > 0 && !p.monthlyKwh && tariffModelOf(p) !== 'flat' && (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800" role="status">
+              The monthly bill ({money(p.monthlyBill, currency)}) is less than this tariff's fixed charges ({money(monthBill(p, 0), currency)}), so no
+              usage can be worked out. Check the tariff{usesMaxDemandModel(tariffModelOf(p)) ? ' and maximum demand' : ''}, or enter the usage in kWh.
+            </p>
+          )}
           {energy.consumptionKwh > 0 && (
             <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
               Usage {num(energy.consumptionKwh / 12)} kWh/month → bill about{' '}

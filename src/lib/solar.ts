@@ -1,5 +1,5 @@
 import type { DesignSettings, LatLng, Project, RoofFace } from '../types';
-import { tnbDomesticBill, tnbKwhForBill } from './tnbTariff';
+import { TNB_TARIFF_NAME, tnbBill, tnbKwhForBill, type TnbOptions, type TnbTariffId } from './tnbTariff';
 
 /* ------------------------------------------------------------------ */
 /* Roof faces                                                          */
@@ -299,35 +299,85 @@ export function setAfaSen(v: number) {
 }
 export const currentAfaSen = () => afaSen;
 
-export type TariffModel = 'tnb' | 'tnb-tou' | 'flat';
+/** 'tnb' / 'tnb-tou' are the Domestic tariffs (their stored names); the rest are Non-Domestic. */
+export type TariffModel = 'tnb' | 'tnb-tou' | 'lv' | 'lv-tou' | 'mv' | 'mv-tou' | 'hv' | 'hv-tou' | 'flat';
 
-/** TNB Domestic unless chosen otherwise; projects from a non-residential TNB bill default to the flat rate. */
-export function tariffModelOf(p: Pick<Project, 'energy' | 'bill'>): TariffModel {
-  return p.energy.tariffModel ?? (p.bill && p.bill.category !== 'residential' ? 'flat' : 'tnb');
-}
+const TNB_ID: Record<Exclude<TariffModel, 'flat'>, TnbTariffId> = {
+  tnb: 'dom',
+  'tnb-tou': 'dom-tou',
+  lv: 'lv',
+  'lv-tou': 'lv-tou',
+  mv: 'mv',
+  'mv-tou': 'mv-tou',
+  hv: 'hv',
+  'hv-tou': 'hv-tou',
+};
+
+export const tnbIdOf = (m: TariffModel): TnbTariffId | null => (m === 'flat' ? null : TNB_ID[m]);
 
 export const TARIFF_LABEL: Record<TariffModel, string> = {
-  tnb: 'TNB Domestic General',
-  'tnb-tou': 'TNB Domestic Time of Use',
+  tnb: `TNB ${TNB_TARIFF_NAME.dom}`,
+  'tnb-tou': `TNB ${TNB_TARIFF_NAME['dom-tou']}`,
+  lv: `TNB ${TNB_TARIFF_NAME.lv}`,
+  'lv-tou': `TNB ${TNB_TARIFF_NAME['lv-tou']}`,
+  mv: `TNB ${TNB_TARIFF_NAME.mv}`,
+  'mv-tou': `TNB ${TNB_TARIFF_NAME['mv-tou']}`,
+  hv: `TNB ${TNB_TARIFF_NAME.hv}`,
+  'hv-tou': `TNB ${TNB_TARIFF_NAME['hv-tou']}`,
   flat: 'Flat rate',
 };
 
+/**
+ * The TNB non-domestic tariff a scanned bill points to: by the voltage named in the tariff
+ * (Rendah / Sederhana / Tinggi, or the older B / C / D / E codes), else Medium Voltage when the
+ * bill has a maximum demand, else Low Voltage. ToU when the tariff says so.
+ */
+export function nonDomesticTariffFor(bill: NonNullable<Project['bill']>): TariffModel {
+  const t = `${bill.tariff ?? ''}`;
+  const tou = /\bToU\b|Masa Penggunaan|Time of Use/i.test(t);
+  let level: 'lv' | 'mv' | 'hv';
+  if (/Tinggi|High Voltage|\bE3\b|\bF3\b/i.test(t)) level = 'hv';
+  else if (/Sederhana|Medium Voltage|\bC[12]\b|\bE[12]\b|\bF[12]\b/i.test(t)) level = 'mv';
+  else if (/Rendah|Low Voltage|\bB\b|\bD\b/i.test(t)) level = 'lv';
+  else level = (bill.maxDemandKw ?? 0) > 0 ? 'mv' : 'lv';
+  return (tou ? `${level}-tou` : level) as TariffModel;
+}
+
+/** The chosen tariff; otherwise TNB Domestic, or the matching Non-Domestic tariff for a shop or factory bill. */
+export function tariffModelOf(p: Pick<Project, 'energy' | 'bill'>): TariffModel {
+  if (p.energy.tariffModel) return p.energy.tariffModel;
+  return p.bill && p.bill.category !== 'residential' ? nonDomesticTariffFor(p.bill) : 'tnb';
+}
+
 const DEFAULT_TOU_PEAK_PCT = 50;
 export const touPeakPctOf = (p: Pick<Project, 'energy'>) => p.energy.touPeakPct ?? DEFAULT_TOU_PEAK_PCT;
+export const isTouModel = (m: TariffModel) => m.endsWith('-tou');
+export const usesMaxDemandModel = (m: TariffModel) => m.startsWith('mv') || m.startsWith('hv');
+
+/** Maximum demand for Medium / High Voltage bills, kW: entered on the Energy tab, else from the scanned bill. */
+export const maxDemandOf = (p: Pick<Project, 'energy' | 'bill'>) => p.energy.maxDemandKw ?? p.bill?.maxDemandKw ?? 0;
+
+/** Options for the TNB bill of this project. */
+export function tnbOptionsOf(p: Pick<Project, 'energy' | 'bill'>): TnbOptions | null {
+  const m = tariffModelOf(p);
+  const id = tnbIdOf(m);
+  if (!id) return null;
+  return { tariff: id, afaSen, touPeakPct: isTouModel(m) ? touPeakPctOf(p) : undefined, maxDemandKw: usesMaxDemandModel(m) ? maxDemandOf(p) : undefined };
+}
 
 /** A month's bill for `kwh` from the grid, at today's prices; `fixedCharge` applies to the flat rate only. */
 export function monthBill(p: Pick<Project, 'energy' | 'bill'>, kwh: number, fixedCharge = 0): number {
-  const model = tariffModelOf(p);
-  if (model === 'flat') return fixedCharge + Math.max(0, kwh) * p.energy.tariff;
-  return tnbDomesticBill(kwh, { afaSen, touPeakPct: model === 'tnb-tou' ? touPeakPctOf(p) : undefined }).total;
+  const opts = tnbOptionsOf(p);
+  if (!opts) return fixedCharge + Math.max(0, kwh) * p.energy.tariff;
+  return tnbBill(kwh, opts).total;
 }
 
 /** Yearly electricity use: from the scanned bill when there is one, else worked back from the monthly bill. */
 export function annualUsageKwh(p: Pick<Project, 'monthlyBill' | 'monthlyKwh' | 'energy' | 'bill'>): number {
   if (p.monthlyKwh && p.monthlyKwh > 0) return p.monthlyKwh * 12;
   if (p.monthlyBill <= 0) return 0;
-  const model = tariffModelOf(p);
-  if (model !== 'flat') return tnbKwhForBill(p.monthlyBill, { afaSen, touPeakPct: model === 'tnb-tou' ? touPeakPctOf(p) : undefined }) * 12;
+  const opts = tnbOptionsOf(p);
+  if (opts) return tnbKwhForBill(p.monthlyBill, opts) * 12;
   return p.energy.tariff > 0 ? (p.monthlyBill * 12) / p.energy.tariff : 0;
 }
 
