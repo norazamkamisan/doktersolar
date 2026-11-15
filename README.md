@@ -33,7 +33,7 @@ A solar design and proposal studio: sketch a roof on satellite imagery, auto-fil
   </tr>
 </table>
 
-**Stack:** React 18 · Vite · TypeScript · Tailwind CSS · React Router · Leaflet (react-leaflet) with Esri World Imagery · Recharts · localStorage · Vercel (+ an optional serverless function for NREL PVWatts). Netlify config is included too.
+**Stack:** React 18 · Vite · TypeScript · Tailwind CSS · React Router · Leaflet (react-leaflet) with Esri World Imagery · Recharts · localStorage, synced to a JSON file in Google Drive · Vercel (+ an optional serverless function for NREL PVWatts). Netlify config is included too.
 
 ---
 
@@ -61,8 +61,11 @@ Five sample projects in Malaysia are seeded on first load. Default currency is *
 doktersolar/
 ├─ vercel.json                  # Vercel build + SPA rewrite
 ├─ middleware.js                # password login (Vercel Routing Middleware)
-├─ tests/middleware.test.mjs    # npm test
+├─ tests/                       # npm test: middleware + data merge rules
 ├─ api/pvwatts.js               # Vercel Function → /api/pvwatts
+├─ api/data.js                  # Vercel Function → /api/data (shared data in Google Drive)
+├─ server/drive-store.mjs       # Google Drive read/write with a service account
+├─ server/data-merge.mjs        # how changes from several devices are combined
 ├─ server/pvwatts-core.mjs      # shared NREL PVWatts proxy logic (key stays server-side)
 ├─ netlify.toml                 # Netlify build + /api and SPA redirects (alternative host)
 ├─ netlify/functions/pvwatts.mjs  # Netlify Function wrapper around the same core
@@ -75,6 +78,7 @@ doktersolar/
 │  ├─ lib/
 │  │  ├─ solar.ts      # roof geometry, panel layout, energy + financial model
 │  │  ├─ store.ts      # localStorage-backed store + React hooks
+│  │  ├─ sync.ts       # syncs the store with /api/data (Google Drive)
 │  │  ├─ defaults.ts   # default settings / design / energy
 │  │  ├─ seed.ts       # 5 demo projects
 │  │  ├─ api.ts        # Nominatim geocoding, PVWatts client, share-link encoding
@@ -194,6 +198,24 @@ The app sits behind one shared password, checked on Vercel's servers by [`middle
 
 Vercel's own "Password Protection" is a paid Pro feature. This middleware does the same job on the free Hobby plan.
 
+### Shared data in Google Drive
+
+Without this, each browser keeps its own data, and browsers can delete it (iPhones do after about 7 days without a visit). With it, all projects and settings live in **one JSON file in your Google Drive**, shared by every device and person who signs in. Each browser keeps a working copy, so the app still works offline and saves when it's back online. The sidebar shows **Saved to Google Drive**, or what's waiting. Drive keeps the file's version history, so an older copy can be restored from Drive.
+
+One-time setup (about 15 minutes):
+
+1. **Google Cloud project:** at [console.cloud.google.com](https://console.cloud.google.com), create a project (e.g. "DokterSolar"), then go to **APIs & Services → Library**, find **Google Drive API** and click **Enable**.
+2. **Service account** (a robot account that edits the file): **IAM & Admin → Service Accounts → Create service account**, name it e.g. `doktersolar-sync`, skip the optional roles. Open it, go to **Keys → Add key → Create new key → JSON**. A key file downloads. Keep it private and don't commit it.
+3. **Data file:** in Google Drive, upload an empty text file named `doktersolar-data.json` (or any file; it gets overwritten). Click **Share**, add the service account's email (`…@….iam.gserviceaccount.com`, shown on its page) as **Editor**, and untick "Notify". Copy the file id from its link: `drive.google.com/file/d/<FILE_ID>/view`.
+4. **Vercel:** in **Project → Settings → Environment Variables**, add for Production (and Preview if you like):
+   - `GOOGLE_SERVICE_ACCOUNT_KEY`: the whole contents of the key file, as a **Secret**
+   - `DRIVE_FILE_ID`: the file id
+   Then redeploy.
+
+The first browser to open the site uploads its projects. Other devices then merge in anything they have that Drive doesn't. After that, Drive is the shared copy: when two devices change the same project, the later change wins, and deleted projects stay deleted. **Reset demo data** is hidden while Drive storage is on, so it can't wipe everyone's data.
+
+If either variable is missing, the app falls back to browser-only storage. `/api/data` is behind the site password like every other API.
+
 ### Deploying to Netlify instead
 
 `netlify.toml` is kept, so Netlify works with no changes. Import the repo in Netlify; the build settings and the `/api/* → /.netlify/functions/*` redirect come from the file. Set `NREL_API_KEY` under **Site configuration → Environment variables**. The password login uses Vercel middleware, so a Netlify deploy is **not** password-protected.
@@ -215,7 +237,8 @@ These are indicative estimates for a portfolio demo, not engineering-grade simul
 
 ## Notes & limitations
 
-- **Storage:** all data lives in `localStorage` in your browser. Clearing site data, or using another browser, gives a fresh demo. Use **Settings → Reset demo data** to start over.
+- **Storage:** with [Google Drive set up](#shared-data-in-google-drive), data is shared and backed up. Without it, all data lives in `localStorage` in your browser: clearing site data, using another browser, or (on iPhone) a week without visiting loses it. Use **Settings → Reset demo data** to start over.
+- **Simultaneous edits:** the Drive file is rewritten on each save. If two people save at the very same moment, one save can overwrite the other. Fine for a small team, but this isn't a multi-user database.
 - **Share links** embed the proposal as base64 JSON in the URL fragment (`#d=…`). The fragment is never sent to the server. The uploaded logo is left out to keep links short.
 - **Nominatim** is a free, rate-limited service (about 1 request per second). Geocoding runs only when you create a project or press **Locate/Go**.
 - **Imagery:** Esri World Imagery tiles. Keep the on-map attribution. Check Esri's terms before any commercial use.

@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { FileText, FolderKanban, Home, LayoutGrid, LogOut, Menu, Plus, Search, Settings, UserPlus, X } from 'lucide-react';
 import { BrandLogo } from './Logo';
 import NewProjectModal from './NewProjectModal';
+import SyncStatus from './SyncStatus';
 import { useSettings } from '../lib/store';
 import { initials } from '../lib/format';
 
@@ -50,7 +51,7 @@ export default function Layout() {
         </NavLink>
       ))}
       <div className="mt-auto space-y-2">
-        <div className="rounded-lg bg-slate-50 p-3 text-xs text-slate-500">Data is stored in this browser. Reset demo data in Settings.</div>
+        <SyncStatus />
         {/* /logout is handled by middleware.js on Vercel, so it only exists in production builds */}
         {import.meta.env.PROD && (
           <a
