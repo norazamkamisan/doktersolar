@@ -19,7 +19,7 @@ import {
 import { TNB_2025, tnbTariffRows } from '../lib/tnbTariff';
 import { DEFAULT_SETTINGS } from '../lib/defaults';
 import { money, num } from '../lib/format';
-import { fillTerms, inverterLine, issuedAt, longDate, panelLine, paragraphs, quoteFor, quoteNumber, shortName, validUntil } from '../lib/proposal';
+import { preparedBy as preparedByOf, fillTerms, inverterLine, issuedAt, longDate, panelLine, paragraphs, quoteFor, quoteNumber, shortName, validUntil } from '../lib/proposal';
 import { CATEGORY_LABEL } from '../lib/billAnalysis';
 import SolarMap from './SolarMap';
 import environmentPhoto from '../assets/environment.jpg';
@@ -164,8 +164,9 @@ const ProposalDocument = forwardRef<HTMLElement, { project: Project; settings: D
   const avgAfter = months.reduce((t, m) => t + m.billAfter, 0) / 12;
   const payback = fin.paybackYears;
   const paybackText = payback == null ? 'over 25 years' : `${Math.floor(payback)} years, ${Math.round((payback % 1) * 12)} months`;
-  const preparedBy = s.userName;
-  const contactLine = [s.userEmail || s.companyEmail, s.userPhone || s.companyPhone].filter(Boolean).join(' - ');
+  const rep = preparedByOf(p, s);
+  const preparedBy = rep.name;
+  const contactLine = [rep.email || s.companyEmail, rep.phone || s.companyPhone].filter(Boolean).join(' - ');
 
   /* ------------------------------ pages ------------------------------ */
   const pages: { key: string; body: ReactNode }[] = [];
@@ -177,8 +178,8 @@ const ProposalDocument = forwardRef<HTMLElement, { project: Project; settings: D
         <div className={`grid gap-4 text-xs leading-relaxed text-slate-800 ${r('sm:grid-cols-3', 'grid-cols-3')}`}>
           <div>
             <p className="font-bold">Prepared by: {preparedBy}</p>
-            {s.userPhone && <p>{s.userPhone}</p>}
-            {s.userEmail && <p>{s.userEmail}</p>}
+            {rep.phone && <p>{rep.phone}</p>}
+            {rep.email && <p>{rep.email}</p>}
           </div>
           <div>
             <p className="font-bold">For: {first}</p>

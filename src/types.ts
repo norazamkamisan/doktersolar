@@ -100,6 +100,8 @@ export interface Project {
   bill?: ProjectBill;
   proposalSentAt: string | null;
   quote?: ProjectQuote;
+  /** Settings.salespeople id: who prepared the proposal */
+  salespersonId?: string;
 }
 
 export interface ProjectBill extends TnbBill {
@@ -160,10 +162,19 @@ export interface Settings {
   /** terms & conditions page; placeholders {customer} {address} {price} {deposit} {depositPct}. Empty = no page */
   terms: string;
   caseStudies: CaseStudy[];
+  /** sales team: chosen per project as "Prepared by" (else the userName / userPhone / userEmail above) */
+  salespeople: Salesperson[];
   /** fixed monthly charge on the electricity bill with the flat tariff (stays after solar) */
   fixedCharge: number;
   /** TNB Automatic Fuel Adjustment, sen/kWh: changes monthly */
   afaSen: number;
+}
+
+export interface Salesperson {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
 }
 
 export interface CaseStudy {

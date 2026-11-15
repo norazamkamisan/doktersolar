@@ -46,6 +46,7 @@ export const DEFAULT_SETTINGS: Settings = {
     'Equipment warranties are as stated by each manufacturer, shown in this proposal.',
   ].join('\n'),
   caseStudies: [],
+  salespeople: [],
   fixedCharge: 10,
   afaSen: 3.6,
 };

@@ -2,6 +2,7 @@ import { FormEvent, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, Loader2, X } from 'lucide-react';
 import { createProject, useSettings } from '../lib/store';
+import { SalespersonSelect, lastSalespersonId, rememberSalesperson } from './Salespeople';
 import { geocode } from '../lib/api';
 import { NAME_HIDDEN, type BillCategory, type TnbBill } from '../lib/tnbBill';
 import { DEFAULT_TARGET_OFFSET, analyseBill, billProjectFields } from '../lib/billAnalysis';
@@ -11,6 +12,7 @@ export default function NewProjectModal({ onClose }: { onClose: () => void }) {
   const settings = useSettings();
   const navigate = useNavigate();
   const [form, setForm] = useState({ customerName: '', email: '', phone: '', address: '', monthlyBill: '' });
+  const [salespersonId, setSalespersonId] = useState(() => lastSalespersonId(settings));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -60,7 +62,7 @@ export default function NewProjectModal({ onClose }: { onClose: () => void }) {
     let loc: { lat: number; lng: number } | null = null;
     try {
       // bills mask the house number as "XX", which only confuses the map search
-      loc = await geocode(form.address.replace(/^s*X+s*,s*/i, ''), 6000);
+      loc = await geocode(form.address.replace(/^\s*X+\s*,\s*/i, ''), 6000);
     } catch {
       /* geocoding is best-effort: the project is still saved, and can be located on the map later */
     }
@@ -74,7 +76,9 @@ export default function NewProjectModal({ onClose }: { onClose: () => void }) {
       monthlyBill: Number(form.monthlyBill) || 0,
       lat: loc?.lat ?? null,
       lng: loc?.lng ?? null,
+      salespersonId: salespersonId || undefined,
     });
+    rememberSalesperson(salespersonId);
     setBusy(false);
     onClose();
     navigate(`/projects/${p.id}/${fromBill ? 'proposal' : 'design'}`);
@@ -160,6 +164,11 @@ export default function NewProjectModal({ onClose }: { onClose: () => void }) {
               onChange={set('monthlyBill')}
             />
           </div>
+          {(settings.salespeople ?? []).length > 0 && (
+            <div className="sm:col-span-2">
+              <SalespersonSelect id="np-salesperson" settings={settings} value={salespersonId} onChange={setSalespersonId} />
+            </div>
+          )}
         </div>
         {bill && analysis && (
           <div className="mt-6 space-y-4 border-t border-slate-100 pt-5">
