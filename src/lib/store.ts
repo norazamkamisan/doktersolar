@@ -97,7 +97,7 @@ export function newId(): string {
 export type NewProjectInput = Pick<Project, 'customerName' | 'email' | 'phone' | 'address' | 'monthlyBill'> & {
   lat: number | null;
   lng: number | null;
-} & Partial<Pick<Project, 'notes' | 'monthlyKwh' | 'importedKw' | 'bill'>> & {
+} & Partial<Pick<Project, 'notes' | 'monthlyKwh' | 'importedKw' | 'bill' | 'salespersonId'>> & {
     /** overrides for the default energy settings (e.g. the tariff from a scanned bill) */
     energy?: Partial<EnergySettings>;
   };

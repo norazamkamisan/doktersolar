@@ -9,6 +9,12 @@ export function shortName(full: string): string {
   return (cut > 0 ? name.slice(0, cut) : name) || 'Customer';
 }
 
+/** Who prepared the proposal: the project's salesperson, else the name, phone and email in Settings. */
+export function preparedBy(p: Pick<Project, 'salespersonId'>, s: Pick<Settings, 'salespeople' | 'userName' | 'userPhone' | 'userEmail'>) {
+  const sp = p.salespersonId ? (s.salespeople ?? []).find((x) => x.id === p.salespersonId) : undefined;
+  return sp ?? { id: '', name: s.userName, phone: s.userPhone, email: s.userEmail };
+}
+
 /** Quote number: the OpenSolar project number for imported projects, else the project id. */
 export function quoteNumber(p: Project): string {
   return p.id.replace(/^os-/, '').toUpperCase();

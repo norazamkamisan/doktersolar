@@ -6,6 +6,7 @@ import { geocode } from '../../lib/api';
 import { date, money, num } from '../../lib/format';
 import { energyFor, hasRoof, recommendedKw } from '../../lib/solar';
 import { Field } from '../../components/ui';
+import { SalespersonSelect } from '../../components/Salespeople';
 import { NAME_HIDDEN, type BillCategory, type TnbBill } from '../../lib/tnbBill';
 import { DEFAULT_TARGET_OFFSET, analyseBill, billProjectFields } from '../../lib/billAnalysis';
 import { BillDetails, BillSizing, BillWarnings, ScanBillButton } from '../../components/BillScan';
@@ -105,6 +106,7 @@ export default function InfoTab({ project: p }: { project: Project }) {
           <Field label="Customer name" value={p.customerName} onChange={set('customerName')} />
           <Field label="Email" type="email" value={p.email} onChange={set('email')} />
           <Field label="Phone" type="tel" value={p.phone} onChange={set('phone')} />
+          <SalespersonSelect settings={settings} value={p.salespersonId} onChange={(id) => updateProject(p.id, { salespersonId: id || undefined })} />
           <Field
             label={`Avg. monthly bill (${settings.currency})`}
             type="number"

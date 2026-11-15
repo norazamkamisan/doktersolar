@@ -7,6 +7,7 @@ import { Field, NumberField, PageHeader } from '../components/ui';
 import { BrandLogo } from '../components/Logo';
 import OpenSolarImportCard from '../components/OpenSolarImportCard';
 import ProposalSettings from '../components/ProposalSettings';
+import SalesTeamSettings from '../components/Salespeople';
 
 /** Read an image file, downscale it to fit 400×160 and return a base64 data URL. */
 function fileToLogo(file: File): Promise<string> {
@@ -83,12 +84,14 @@ export default function SettingsPage() {
               <textarea className="input leading-relaxed" rows={3} value={s.companyAddress} onChange={(e) => updateSettings({ companyAddress: e.target.value })} />
             </div>
           </div>
-          <h3 className="mb-3 mt-6 font-medium text-slate-900">Prepared by</h3>
+          <h3 className="mt-6 font-medium text-slate-900">Prepared by (default)</h3>
+          <p className="mb-3 text-sm text-slate-500">Used on proposals when no salesperson is picked for the project.</p>
           <div className="grid gap-4 sm:grid-cols-3">
             <Field label="Your name" value={s.userName} onChange={(e) => updateSettings({ userName: e.target.value })} />
             <Field label="Your phone" value={s.userPhone} onChange={(e) => updateSettings({ userPhone: e.target.value })} />
             <Field label="Your email" type="email" value={s.userEmail} onChange={(e) => updateSettings({ userEmail: e.target.value })} />
           </div>
+          <SalesTeamSettings s={s} />
         </section>
 
         <section className="card p-5 sm:p-6">
