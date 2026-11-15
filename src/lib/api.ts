@@ -1,4 +1,5 @@
-import type { Project, PvWattsResult, Settings } from '../types';
+import type { LatLng, Project, PvWattsResult, Settings } from '../types';
+import { layoutPanels, systemKw } from './solar';
 
 export interface GeocodeResult {
   lat: number;
@@ -49,16 +50,34 @@ export async function geocode(address: string, timeoutMs = 8000): Promise<Geocod
   }
 }
 
-/** Calls our serverless function (Vercel or Netlify), which holds the NREL key server-side. */
+/**
+ * Calls our serverless function (Vercel or Netlify), which holds the NREL key server-side.
+ * A design with several roof faces gets one request per face (each with its own tilt and
+ * azimuth), and the results are added up.
+ */
 export async function fetchPvWatts(p: Project): Promise<PvWattsResult> {
   if (p.lat == null || p.lng == null) throw new Error('Project has no location yet.');
   if (p.systemKw <= 0) throw new Error('Design a system first (no panels placed).');
+  const faces = layoutPanels(p.design).faces.filter((f) => f.panels.length > 0);
+  // no drawn roof (imported size): one array with the design's tilt and azimuth
+  const arrays = faces.length
+    ? faces.map((f) => ({ kw: systemKw(f.panels.length, p.design.panelWattage), tilt: f.tilt, azimuth: f.azimuth }))
+    : [{ kw: p.systemKw, tilt: p.design.tilt, azimuth: p.design.azimuth }];
+  const results = await Promise.all(arrays.map((a) => pvWattsArray(p.lat!, p.lng!, a.kw, a.tilt, a.azimuth)));
+  return {
+    annual: results.reduce((s, r) => s + r.annual, 0),
+    monthly: Array.from({ length: 12 }, (_, m) => results.reduce((s, r) => s + (r.monthly[m] ?? 0), 0)),
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
+async function pvWattsArray(lat: number, lng: number, kw: number, tilt: number, azimuth: number): Promise<{ annual: number; monthly: number[] }> {
   const q = new URLSearchParams({
-    lat: String(p.lat),
-    lon: String(p.lng),
-    system_capacity: p.systemKw.toFixed(3),
-    tilt: String(p.design.tilt),
-    azimuth: String(p.design.azimuth),
+    lat: String(lat),
+    lon: String(lng),
+    system_capacity: kw.toFixed(3),
+    tilt: String(tilt),
+    azimuth: String(azimuth),
   });
   const res = await fetch(`/api/pvwatts?${q}`);
   const text = await res.text();
@@ -69,7 +88,7 @@ export async function fetchPvWatts(p: Project): Promise<PvWattsResult> {
     throw new Error('PVWatts function is not available here (run with `vercel dev`, or use the deployed site).');
   }
   if (!res.ok || body.error) throw new Error(body.error ?? `PVWatts request failed (${res.status})`);
-  return { annual: body.annual!, monthly: body.monthly!, fetchedAt: new Date().toISOString() };
+  return { annual: body.annual!, monthly: body.monthly! };
 }
 
 /* ------------------------------------------------------------------ */
@@ -106,8 +125,9 @@ async function pipeBytes(bytes: Uint8Array, stream: CompressionStream | Decompre
 function buildPayload(p: Project, s: Settings): SharePayload {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { logo: _logo, ...rest } = s;
-  const roundedRoof = p.design.roof.map(([a, b]) => [+a.toFixed(7), +b.toFixed(7)] as [number, number]);
-  return { p: { ...p, notes: '', design: { ...p.design, roof: roundedRoof } }, s: rest };
+  const round = (ring: LatLng[]) => ring.map(([a, b]) => [+a.toFixed(7), +b.toFixed(7)] as LatLng);
+  const design = { ...p.design, roof: round(p.design.roof), extraRoofs: p.design.extraRoofs?.map((f) => ({ ...f, roof: round(f.roof) })) };
+  return { p: { ...p, notes: '', design }, s: rest };
 }
 
 /** The `#z=…` (or `#d=…`) fragment that carries a proposal. */

@@ -1,15 +1,12 @@
 import { FormEvent, useMemo, useState } from 'react';
-import { Check, Loader2, MousePointerClick, Move, PenLine, RotateCcw, Search, Trash2, Undo2, X, type LucideIcon } from 'lucide-react';
-import type { LatLng, Project } from '../../types';
+import { Check, Loader2, MousePointerClick, Move, PenLine, Plus, RotateCcw, Search, Trash2, Undo2, X, type LucideIcon } from 'lucide-react';
+import type { LatLng, Project, RoofFace } from '../../types';
 import { updateDesign, updateProject } from '../../lib/store';
 import { geocode } from '../../lib/api';
-import { layoutPanels, recommendedKw, systemKw } from '../../lib/solar';
+import { compass, facesPatch, layoutPanels, recommendedKw, systemKw } from '../../lib/solar';
 import { num } from '../../lib/format';
 import SolarMap from '../../components/SolarMap';
 import { NumberField } from '../../components/ui';
-
-const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-const compass = (az: number) => COMPASS[Math.round((((az % 360) + 360) % 360) / 45) % 8];
 
 /** drop near-duplicate consecutive points (a double-click fires two clicks first) */
 function cleanRing(pts: LatLng[]): LatLng[] {
@@ -71,9 +68,12 @@ function ToolButton({
 
 export default function DesignTab({ project: p }: { project: Project }) {
   const d = p.design;
-  const [drawing, setDrawing] = useState(false);
+  /** null = not drawing; -1 = drawing a new roof; n = redrawing roof n */
+  const [drawTarget, setDrawTarget] = useState<number | null>(null);
+  const drawing = drawTarget !== null;
   const [draft, setDraft] = useState<LatLng[]>([]);
   const [editing, setEditing] = useState(false);
+  const [selected, setSelected] = useState(0);
   const [query, setQuery] = useState(p.address);
   const [searching, setSearching] = useState(false);
   const [searchMsg, setSearchMsg] = useState('');
@@ -81,9 +81,22 @@ export default function DesignTab({ project: p }: { project: Project }) {
   const [recenterKey, setRecenterKey] = useState(0);
 
   const layout = useMemo(() => layoutPanels(d), [d]);
+  const faces = layout.faces;
+  const active = Math.min(selected, Math.max(0, faces.length - 1));
+  const face = faces[active];
   const sizeKw = systemKw(layout.panels.length, d.panelWattage);
   const recommended = recommendedKw(p);
   const center: LatLng | null = p.lat != null && p.lng != null ? [p.lat, p.lng] : null;
+  const multi = faces.length > 1;
+
+  const setFaces = (next: RoofFace[]) => updateDesign(p.id, facesPatch(next));
+  const plainFaces = (): RoofFace[] => faces.map(({ roof, tilt, azimuth }) => ({ roof, tilt, azimuth }));
+  const updateFace = (i: number, patch: Partial<RoofFace>) => setFaces(plainFaces().map((f, j) => (j === i ? { ...f, ...patch } : f)));
+  // tilt / azimuth apply to the selected roof (or to the design itself before any roof is drawn)
+  const setTilt = (tilt: number) => (face ? updateFace(active, { tilt }) : updateDesign(p.id, { tilt }));
+  const setAzimuth = (azimuth: number) => (face ? updateFace(active, { azimuth }) : updateDesign(p.id, { azimuth }));
+  const tilt = face?.tilt ?? d.tilt;
+  const azimuth = face?.azimuth ?? d.azimuth;
 
   const search = async (e: FormEvent) => {
     e.preventDefault();
@@ -104,22 +117,42 @@ export default function DesignTab({ project: p }: { project: Project }) {
     setSearching(false);
   };
 
-  const startDrawing = () => {
+  const startDrawing = (target: number) => {
     setEditing(false);
     setDraft([]);
-    setDrawing(true);
+    setDrawTarget(target);
+  };
+
+  const stopDrawing = () => {
+    setDrawTarget(null);
+    setDraft([]);
   };
 
   const finish = () => {
     const ring = cleanRing(draft);
-    if (ring.length < 3) return;
-    updateDesign(p.id, { roof: ring });
+    if (ring.length < 3 || drawTarget === null) return;
+    if (drawTarget < 0 || drawTarget >= faces.length) {
+      // a new roof starts with the selected roof's pitch and direction; change them under "Roofs"
+      setFaces([...plainFaces(), { roof: ring, tilt, azimuth }]);
+      setSelected(faces.length);
+    } else {
+      updateFace(drawTarget, { roof: ring });
+    }
     if (p.status === 'Lead') updateProject(p.id, { status: 'Designing' });
-    setDrawing(false);
-    setDraft([]);
+    stopDrawing();
   };
 
-  const moveVertex = (i: number, ll: LatLng) => updateDesign(p.id, { roof: d.roof.map((v, j) => (j === i ? ll : v)) });
+  const deleteFace = (i: number) => {
+    setEditing(false);
+    setFaces(plainFaces().filter((_, j) => j !== i));
+    setSelected(Math.max(0, i - 1));
+  };
+
+  const moveVertex = (vi: number, ll: LatLng) => {
+    if (face) updateFace(active, { roof: face.roof.map((v, j) => (j === vi ? ll : v)) });
+  };
+
+  const drawingLabel = drawTarget !== null && drawTarget >= 0 && drawTarget < faces.length ? `roof ${drawTarget + 1}` : `roof ${faces.length + 1}`;
 
   return (
     <div className="grid gap-4 xl:grid-cols-[1fr_340px]">
@@ -135,7 +168,7 @@ export default function DesignTab({ project: p }: { project: Project }) {
         </form>
         {searchMsg && <p className="text-xs text-red-600">{searchMsg}</p>}
         {searchInfo && <p className="text-xs text-amber-700">{searchInfo}</p>}
-        {!!p.importedKw && d.roof.length < 3 && !drawing && (
+        {!!p.importedKw && !faces.length && !drawing && (
           <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-800" role="note">
             {p.bill ? 'Sized from the TNB bill' : 'Imported from OpenSolar'} as a <strong>{num(p.importedKw, 2)} kWp</strong> system.
             Draw the roof to lay out panels here; the drawn layout then replaces {p.bill ? 'the recommended' : 'the imported'} size.
@@ -144,7 +177,7 @@ export default function DesignTab({ project: p }: { project: Project }) {
         {!center && !drawing && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800" role="status">
             <strong>This project has no map location yet.</strong>{' '}
-            {d.roof.length >= 3
+            {faces.length
               ? 'The roof below may be in the wrong place. Search for the address above to check.'
               : "Search for the address above before drawing the roof. If it isn't found, add the town or postcode."}
           </div>
@@ -153,7 +186,9 @@ export default function DesignTab({ project: p }: { project: Project }) {
         <div className="relative">
           <SolarMap
             center={center}
-            roof={drawing ? [] : d.roof}
+            roofs={faces.map((f, i) => (drawing && i === drawTarget ? [] : f.roof))}
+            activeRoof={drawing || !multi ? -1 : active}
+            onSelectRoof={(i) => setSelected(i)}
             panels={drawing ? [] : layout.panels}
             className="h-[420px] sm:h-[560px]"
             drawing={drawing}
@@ -168,59 +203,48 @@ export default function DesignTab({ project: p }: { project: Project }) {
           {/* floating toolbar: primary action keeps its label; secondary actions are icon-only on phones */}
           <div className="absolute left-14 right-3 top-3 z-[500] flex flex-wrap items-center gap-2 sm:right-auto">
             {!drawing ? (
-              <>
-                <ToolButton primary icon={PenLine} label={d.roof.length ? 'Redraw roof' : 'Draw roof'} onClick={startDrawing} />
-                {d.roof.length >= 3 && (
-                  <>
-                    <ToolButton
-                      icon={Move}
-                      label={editing ? 'Done editing' : 'Edit corners'}
-                      compact
-                      active={editing}
-                      onClick={() => setEditing(!editing)}
-                    />
-                    <ToolButton
-                      icon={Trash2}
-                      label="Clear roof"
-                      compact
-                      onClick={() => {
-                        setEditing(false);
-                        updateDesign(p.id, { roof: [] });
-                      }}
-                    />
-                  </>
-                )}
-                <ToolButton icon={RotateCcw} label="Re-centre map" iconOnly onClick={() => setRecenterKey((k) => k + 1)} />
-              </>
+              faces.length ? (
+                <>
+                  <ToolButton primary icon={Plus} label="Add roof" onClick={() => startDrawing(-1)} />
+                  <ToolButton icon={PenLine} label={multi ? `Redraw roof ${active + 1}` : 'Redraw roof'} compact onClick={() => startDrawing(active)} />
+                  <ToolButton
+                    icon={Move}
+                    label={editing ? 'Done editing' : 'Edit corners'}
+                    compact
+                    active={editing}
+                    onClick={() => setEditing(!editing)}
+                  />
+                  <ToolButton icon={Trash2} label={multi ? `Delete roof ${active + 1}` : 'Clear roof'} compact onClick={() => deleteFace(active)} />
+                  <ToolButton icon={RotateCcw} label="Re-centre map" iconOnly onClick={() => setRecenterKey((k) => k + 1)} />
+                </>
+              ) : (
+                <>
+                  <ToolButton primary icon={PenLine} label="Draw roof" onClick={() => startDrawing(-1)} />
+                  <ToolButton icon={RotateCcw} label="Re-centre map" iconOnly onClick={() => setRecenterKey((k) => k + 1)} />
+                </>
+              )
             ) : (
               <>
                 <ToolButton primary icon={Check} label="Finish" onClick={finish} disabled={cleanRing(draft).length < 3} />
                 <ToolButton icon={Undo2} label="Undo" compact onClick={() => setDraft((c) => c.slice(0, -1))} disabled={!draft.length} />
-                <ToolButton
-                  icon={X}
-                  label="Cancel"
-                  compact
-                  onClick={() => {
-                    setDrawing(false);
-                    setDraft([]);
-                  }}
-                />
+                <ToolButton icon={X} label="Cancel" compact onClick={stopDrawing} />
               </>
             )}
           </div>
 
-          {(drawing || !d.roof.length) && (
+          {(drawing || !faces.length) && (
             <div className="pointer-events-none absolute bottom-6 left-1/2 z-[500] w-max max-w-[90%] -translate-x-1/2 rounded-full bg-slate-900/80 px-4 py-2 text-center text-xs text-white">
               <MousePointerClick className="mr-1 inline h-3.5 w-3.5" />
               {drawing
-                ? `Click each roof corner (${draft.length} placed). Double-click or press Finish to close.`
+                ? `Click each corner of ${drawingLabel} (${draft.length} placed). Double-click or press Finish to close.`
                 : 'Press “Draw roof”, then click around the roof face you want to cover.'}
             </div>
           )}
         </div>
         <p className="text-xs text-slate-500">
-          Panels are filled in rows facing the azimuth, respecting the edge setback. Draw one polygon per roof face for best results. Plan-view
-          panel length is reduced by cos(tilt) to account for roof pitch.
+          Draw one outline per roof face. Use <strong>Add roof</strong> for each side of the roof that should get panels, then set each
+          one&apos;s direction and tilt under <strong>Roofs</strong>. Click an outline on the map to select it. Panels are filled in rows facing
+          each roof&apos;s direction, respecting the edge setback; plan-view panel length is reduced by cos(tilt) to account for roof pitch.
         </p>
       </div>
 
@@ -261,7 +285,91 @@ export default function DesignTab({ project: p }: { project: Project }) {
         </section>
 
         <section className="card space-y-4 p-5">
-          <h3 className="font-semibold text-slate-900">Panel settings</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-slate-900">Roofs</h3>
+            {faces.length > 0 && !drawing && (
+              <button type="button" className="text-sm font-medium text-brand-600 hover:text-brand-700" onClick={() => startDrawing(-1)}>
+                + Add roof
+              </button>
+            )}
+          </div>
+          {faces.length > 0 ? (
+            <ul className="space-y-1.5" aria-label="Roof faces">
+              {faces.map((f, i) => (
+                <li key={i}>
+                  <button
+                    type="button"
+                    onClick={() => setSelected(i)}
+                    aria-pressed={i === active}
+                    className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition ${
+                      i === active ? 'border-brand-300 bg-brand-50' : 'border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: i === active || !multi ? '#f97316' : '#fcd34d' }} /* matches the outline on the map */ aria-hidden="true" />
+                    <span className="flex-1 font-medium text-slate-800">Roof {i + 1}</span>
+                    <span className="tabular-nums text-slate-500">
+                      {f.panels.length} panels · {compass(f.azimuth)} · {f.tilt}°
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-slate-500">No roof drawn yet. These settings apply to the first roof you draw.</p>
+          )}
+
+          <div className="space-y-4 border-t border-slate-100 pt-4">
+            {multi && <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Roof {active + 1}</p>}
+            <div>
+              <div className="flex justify-between">
+                <label className="label" htmlFor="roof-tilt">
+                  Tilt (roof pitch)
+                </label>
+                <span className="text-xs font-medium tabular-nums text-slate-700">{tilt}°</span>
+              </div>
+              <input id="roof-tilt" type="range" min={0} max={60} value={tilt} onChange={(e) => setTilt(Number(e.target.value))} className="w-full accent-brand-500" />
+            </div>
+            <div>
+              <div className="flex justify-between">
+                <label className="label" htmlFor="roof-azimuth">
+                  Azimuth (direction panels face)
+                </label>
+                <span className="text-xs font-medium tabular-nums text-slate-700">
+                  {azimuth}° {compass(azimuth)}
+                </span>
+              </div>
+              <input
+                id="roof-azimuth"
+                type="range"
+                min={0}
+                max={359}
+                value={azimuth}
+                onChange={(e) => setAzimuth(Number(e.target.value))}
+                className="w-full accent-brand-500"
+              />
+              <div className="mt-1 grid grid-cols-4 gap-1">
+                {[
+                  ['N', 0],
+                  ['E', 90],
+                  ['S', 180],
+                  ['W', 270],
+                ].map(([l, v]) => (
+                  <button
+                    key={l}
+                    type="button"
+                    className={`rounded-md py-1 text-xs font-medium ${azimuth === v ? 'bg-brand-100 text-brand-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                    onClick={() => setAzimuth(v as number)}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="card space-y-4 p-5">
+          <h3 className="font-semibold text-slate-900">Panel settings{multi ? ' (all roofs)' : ''}</h3>
           <div className="grid grid-cols-2 gap-3">
             <NumberField label="Wattage" suffix="W" value={d.panelWattage} min={50} onChange={(v) => updateDesign(p.id, { panelWattage: v })} />
             <NumberField label="Max panels" suffix="0 = ∞" value={d.maxPanels} min={0} step={1} onChange={(v) => updateDesign(p.id, { maxPanels: Math.max(0, Math.round(v)) })} />
@@ -280,34 +388,6 @@ export default function DesignTab({ project: p }: { project: Project }) {
                   }`}
                 >
                   {o}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <div className="flex justify-between">
-              <label className="label">Tilt (roof pitch)</label>
-              <span className="text-xs font-medium tabular-nums text-slate-700">{d.tilt}°</span>
-            </div>
-            <input type="range" min={0} max={60} value={d.tilt} onChange={(e) => updateDesign(p.id, { tilt: Number(e.target.value) })} className="w-full accent-brand-500" />
-          </div>
-          <div>
-            <div className="flex justify-between">
-              <label className="label">Azimuth (direction panels face)</label>
-              <span className="text-xs font-medium tabular-nums text-slate-700">
-                {d.azimuth}° {compass(d.azimuth)}
-              </span>
-            </div>
-            <input type="range" min={0} max={359} value={d.azimuth} onChange={(e) => updateDesign(p.id, { azimuth: Number(e.target.value) })} className="w-full accent-brand-500" />
-            <div className="mt-1 grid grid-cols-4 gap-1">
-              {[
-                ['N', 0],
-                ['E', 90],
-                ['S', 180],
-                ['W', 270],
-              ].map(([l, v]) => (
-                <button key={l} className="rounded-md bg-slate-100 py-1 text-xs font-medium text-slate-600 hover:bg-slate-200" onClick={() => updateDesign(p.id, { azimuth: v as number })}>
-                  {l}
                 </button>
               ))}
             </div>

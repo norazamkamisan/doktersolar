@@ -17,8 +17,13 @@ const vertexIcon = L.divIcon({
 
 interface Props {
   center: LatLng | null;
-  roof: LatLng[];
+  /** roof outlines (one per roof face) */
+  roofs: LatLng[][];
   panels: LatLng[][];
+  /** highlighted roof (whose corners can be edited); -1 = none */
+  activeRoof?: number;
+  /** clicking a roof outline (when not drawing) */
+  onSelectRoof?: (index: number) => void;
   className?: string;
   /** static snapshot: no pan/zoom, fits to the roof */
   staticView?: boolean;
@@ -26,6 +31,7 @@ interface Props {
   draft?: LatLng[];
   onMapClick?: (p: LatLng) => void;
   onMapDoubleClick?: () => void;
+  /** show draggable corners on the active roof */
   editVertices?: boolean;
   onMoveVertex?: (index: number, p: LatLng) => void;
   /** bump to re-centre the map on `center` */
@@ -76,8 +82,10 @@ function DoubleClickZoomToggle({ disabled }: { disabled: boolean }) {
 
 export default function SolarMap({
   center,
-  roof,
+  roofs,
   panels,
+  activeRoof = -1,
+  onSelectRoof,
   className = 'h-[480px]',
   staticView = false,
   drawing = false,
@@ -89,6 +97,8 @@ export default function SolarMap({
   recenterKey,
 }: Props) {
   const renderer = useMemo(() => L.canvas({ padding: 0.5 }), []);
+  // all corners of all roofs: used to fit and centre the view
+  const roof = useMemo(() => roofs.filter((r) => r.length >= 3).flat(), [roofs]);
   // The roof is the most precise thing we know; prefer it over the geocoded address.
   const roofCenter: LatLng | null = useMemo(() => {
     if (roof.length < 3) return null;
@@ -120,12 +130,21 @@ export default function SolarMap({
         {!staticView && <ClickHandler onClick={onMapClick} onDouble={onMapDoubleClick} />}
         <DoubleClickZoomToggle disabled={drawing || staticView} />
 
-        {roof.length >= 3 && (
-          <Polygon
-            positions={roof}
-            pathOptions={{ color: '#f97316', weight: 2.5, fillColor: '#f97316', fillOpacity: 0.12 }}
-            interactive={false}
-          />
+        {roofs.map((r, i) =>
+          r.length >= 3 ? (
+            <Polygon
+              // Leaflet reads style and `interactive` only when a layer is created, so re-create on change
+              key={`roof-${i}-${i === activeRoof}-${drawing}`}
+              positions={r}
+              pathOptions={
+                activeRoof < 0 || i === activeRoof
+                  ? { color: '#f97316', weight: 2.5, fillColor: '#f97316', fillOpacity: 0.12 }
+                  : { color: '#fde68a', weight: 2, dashArray: '5 4', fillColor: '#fde68a', fillOpacity: 0.08 }
+              }
+              interactive={!!onSelectRoof && !drawing && !staticView}
+              eventHandlers={onSelectRoof ? { click: () => !drawing && onSelectRoof(i) } : undefined}
+            />
+          ) : null,
         )}
         {panels.map((pts, i) => (
           <Polygon
@@ -152,7 +171,7 @@ export default function SolarMap({
         )}
 
         {editVertices &&
-          roof.map((p, i) => (
+          (roofs[activeRoof] ?? []).map((p, i) => (
             <Marker
               key={`${i}-${p[0]}-${p[1]}`}
               position={p}

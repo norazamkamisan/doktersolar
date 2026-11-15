@@ -1,4 +1,26 @@
-import type { DesignSettings, LatLng, Project } from '../types';
+import type { DesignSettings, LatLng, Project, RoofFace } from '../types';
+
+/* ------------------------------------------------------------------ */
+/* Roof faces                                                          */
+/* ------------------------------------------------------------------ */
+
+/** Every drawn roof face of a design (the first lives in roof/tilt/azimuth). */
+export function roofFaces(d: DesignSettings): RoofFace[] {
+  const first: RoofFace[] = d.roof.length >= 3 ? [{ roof: d.roof, tilt: d.tilt, azimuth: d.azimuth }] : [];
+  return [...first, ...(d.extraRoofs ?? []).filter((f) => f.roof.length >= 3)];
+}
+
+/** Design fields for a new list of roof faces (keeps tilt/azimuth when the last face goes). */
+export function facesPatch(faces: RoofFace[]): Partial<DesignSettings> {
+  if (!faces.length) return { roof: [], extraRoofs: [] };
+  const [first, ...rest] = faces;
+  return { roof: first.roof, tilt: first.tilt, azimuth: first.azimuth, extraRoofs: rest };
+}
+
+export const hasRoof = (d: DesignSettings) => roofFaces(d).length > 0;
+
+const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+export const compass = (az: number) => COMPASS[Math.round((((az % 360) + 360) % 360) / 45) % 8];
 
 /* ------------------------------------------------------------------ */
 /* Geometry                                                            */
@@ -65,35 +87,60 @@ function distToEdges(p: XY, poly: XY[]): number {
   return d;
 }
 
-export interface PanelLayout {
+export interface FaceLayout {
   panels: LatLng[][];
   roofAreaM2: number;
   /** roof surface area, corrected for pitch */
   slopedAreaM2: number;
 }
 
+export interface PanelLayout extends FaceLayout {
+  /** per roof face, in roofFaces() order */
+  faces: (FaceLayout & RoofFace)[];
+}
+
 const MAX_PANELS_HARD = 3000;
 
 /**
- * Fill a roof polygon with a regular grid of panel rectangles.
+ * Lay out panels on every roof face. Panel size, orientation, setback and gap are shared;
+ * each face has its own tilt and azimuth. "Max panels" caps the total, filling faces in order.
+ */
+export function layoutPanels(d: DesignSettings): PanelLayout {
+  let left = d.maxPanels > 0 ? d.maxPanels : Infinity;
+  const faces = roofFaces(d).map((f) => {
+    const l = layoutFace(f, d);
+    const panels = l.panels.slice(0, Math.max(0, left));
+    left -= panels.length;
+    return { ...f, ...l, panels };
+  });
+  return {
+    faces,
+    panels: faces.flatMap((f) => f.panels),
+    roofAreaM2: faces.reduce((s, f) => s + f.roofAreaM2, 0),
+    slopedAreaM2: faces.reduce((s, f) => s + f.slopedAreaM2, 0),
+  };
+}
+
+/**
+ * Fill one roof polygon with a regular grid of panel rectangles.
  * Rows run perpendicular to the azimuth (the direction panels face).
  * On a pitched roof, the plan-view length of each panel shrinks by cos(tilt).
  * Several grid offsets are tried and the one fitting the most panels wins.
  */
-export function layoutPanels(d: DesignSettings): PanelLayout {
-  const roofAreaM2 = polygonAreaM2(d.roof);
-  const slopedAreaM2 = roofAreaM2 / Math.max(0.2, Math.cos(rad(d.tilt)));
-  if (d.roof.length < 3) return { panels: [], roofAreaM2, slopedAreaM2 };
+function layoutFace(face: RoofFace, d: DesignSettings): FaceLayout {
+  const roofAreaM2 = polygonAreaM2(face.roof);
+  const slopedAreaM2 = roofAreaM2 / Math.max(0.2, Math.cos(rad(face.tilt)));
+  if (face.roof.length < 3) return { panels: [], roofAreaM2, slopedAreaM2 };
 
-  const origin = centroid(d.roof);
-  const az = rad(d.azimuth);
+  const origin = centroid(face.roof);
+  const az = rad(face.azimuth);
   const c = Math.cos(az);
   const s = Math.sin(az);
   // rotate world (x east, y north) into (u along-row, v up/down-slope)
   const toUV = ([x, y]: XY): XY => [x * c - y * s, x * s + y * c];
   const fromUV = ([u, v]: XY): XY => [c * u + s * v, -s * u + c * v];
 
-  const poly = d.roof.map((p) => toUV(toLocal(p, origin)));
+  const poly = face.roof.map((p) => toUV(toLocal(p, origin)));
   const us = poly.map((p) => p[0]);
   const vs = poly.map((p) => p[1]);
   const minU = Math.min(...us);
@@ -105,7 +152,7 @@ export function layoutPanels(d: DesignSettings): PanelLayout {
   const short = Math.min(d.panelWidth, d.panelHeight);
   const pu = d.orientation === 'portrait' ? short : long;
   const pvSloped = d.orientation === 'portrait' ? long : short;
-  const pv = pvSloped * Math.cos(rad(Math.min(Math.max(d.tilt, 0), 80)));
+  const pv = pvSloped * Math.cos(rad(Math.min(Math.max(face.tilt, 0), 80)));
   const stepU = pu + d.gap;
   const stepV = pv + d.gap;
   if (stepU <= 0 || stepV <= 0) return { panels: [], roofAreaM2, slopedAreaM2 };
@@ -141,8 +188,6 @@ export function layoutPanels(d: DesignSettings): PanelLayout {
       if (found.length > best.length) best = found;
     }
   }
-
-  if (d.maxPanels > 0) best = best.slice(0, d.maxPanels);
 
   const panels = best.map(([u0, v0]) =>
     (

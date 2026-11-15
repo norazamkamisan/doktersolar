@@ -1,14 +1,14 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useProjects } from '../lib/store';
-import { energyFor, layoutPanels } from '../lib/solar';
+import { energyFor, hasRoof, layoutPanels, roofFaces } from '../lib/solar';
 import { num, relative } from '../lib/format';
 import { Empty, PageHeader, StatusBadge } from '../components/ui';
 import SolarMap from '../components/SolarMap';
 
 export default function Designs() {
   const projects = useProjects();
-  const designed = useMemo(() => projects.filter((p) => p.design.roof.length >= 3).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)), [projects]);
+  const designed = useMemo(() => projects.filter((p) => hasRoof(p.design)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)), [projects]);
 
   return (
     <div className="mx-auto max-w-7xl p-4 sm:p-6">
@@ -20,7 +20,7 @@ export default function Designs() {
               <div className="pointer-events-none">
                 <SolarMap
                   center={p.lat != null && p.lng != null ? [p.lat, p.lng] : null}
-                  roof={p.design.roof}
+                  roofs={roofFaces(p.design).map((f) => f.roof)}
                   panels={layoutPanels(p.design).panels}
                   staticView
                   className="h-48 !rounded-none"

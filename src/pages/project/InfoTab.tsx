@@ -4,7 +4,7 @@ import type { Project } from '../../types';
 import { updateProject, useSettings } from '../../lib/store';
 import { geocode } from '../../lib/api';
 import { date, money, num } from '../../lib/format';
-import { energyFor, recommendedKw } from '../../lib/solar';
+import { energyFor, hasRoof, recommendedKw } from '../../lib/solar';
 import { Field } from '../../components/ui';
 import { NAME_HIDDEN, type BillCategory, type TnbBill } from '../../lib/tnbBill';
 import { DEFAULT_TARGET_OFFSET, analyseBill, billProjectFields } from '../../lib/billAnalysis';
@@ -63,7 +63,7 @@ function BillCard({ project: p }: { project: Project }) {
             panelWattage={p.design.panelWattage}
             idPrefix="info-bill"
           />
-          {p.design.roof.length >= 3 && (
+          {hasRoof(p.design) && (
             <p className="text-xs text-slate-500">The drawn roof layout sets the system size; the recommendation above is for comparison.</p>
           )}
         </div>
