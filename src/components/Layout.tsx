@@ -4,6 +4,7 @@ import { FileText, FolderKanban, Home, LayoutGrid, LogOut, Menu, Plus, Search, S
 import { BrandLogo } from './Logo';
 import NewProjectModal from './NewProjectModal';
 import SyncStatus from './SyncStatus';
+import InstallApp from './InstallApp';
 import { useSettings } from '../lib/store';
 import { initials } from '../lib/format';
 
@@ -51,6 +52,7 @@ export default function Layout() {
         </NavLink>
       ))}
       <div className="mt-auto space-y-2">
+        <InstallApp />
         <SyncStatus />
         {/* /logout is handled by middleware.js on Vercel, so it only exists in production builds */}
         {import.meta.env.PROD && (
