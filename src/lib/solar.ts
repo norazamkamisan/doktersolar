@@ -1,4 +1,5 @@
 import type { DesignSettings, LatLng, Project, RoofFace } from '../types';
+import { tnbDomesticBill, tnbKwhForBill } from './tnbTariff';
 
 /* ------------------------------------------------------------------ */
 /* Roof faces                                                          */
@@ -254,12 +255,6 @@ export function energyFor(p: Project): EnergyResult {
   };
 }
 
-/** Yearly electricity use: from the scanned bill when there is one, else estimated from the monthly bill. */
-export function annualUsageKwh(p: Pick<Project, 'monthlyBill' | 'monthlyKwh' | 'energy'>): number {
-  if (p.monthlyKwh && p.monthlyKwh > 0) return p.monthlyKwh * 12;
-  return p.energy.tariff > 0 ? (p.monthlyBill * 12) / p.energy.tariff : 0;
-}
-
 /** System size needed to cover the customer's use (or the bill's target share of it) with the simple model. */
 export function recommendedKw(p: Pick<Project, 'monthlyBill' | 'monthlyKwh' | 'energy' | 'bill'>): number {
   if (p.energy.peakSunHours <= 0) return 0;
@@ -293,53 +288,100 @@ export function netSystemPrice(p: Project): number {
   return Math.max(0, totalSystemPrice(p) - (p.quote?.discount ?? 0));
 }
 
+/* ------------------------------------------------------------------ */
+/* Electricity bills                                                   */
+/* ------------------------------------------------------------------ */
+
+/** The current TNB AFA rate (sen/kWh), kept in step with Settings by the store. */
+let afaSen = 3.6;
+export function setAfaSen(v: number) {
+  afaSen = Number.isFinite(v) ? v : 0;
+}
+export const currentAfaSen = () => afaSen;
+
+export type TariffModel = 'tnb' | 'tnb-tou' | 'flat';
+
+/** TNB Domestic unless chosen otherwise; projects from a non-residential TNB bill default to the flat rate. */
+export function tariffModelOf(p: Pick<Project, 'energy' | 'bill'>): TariffModel {
+  return p.energy.tariffModel ?? (p.bill && p.bill.category !== 'residential' ? 'flat' : 'tnb');
+}
+
+export const TARIFF_LABEL: Record<TariffModel, string> = {
+  tnb: 'TNB Domestic General',
+  'tnb-tou': 'TNB Domestic Time of Use',
+  flat: 'Flat rate',
+};
+
+const DEFAULT_TOU_PEAK_PCT = 50;
+export const touPeakPctOf = (p: Pick<Project, 'energy'>) => p.energy.touPeakPct ?? DEFAULT_TOU_PEAK_PCT;
+
+/** A month's bill for `kwh` from the grid, at today's prices; `fixedCharge` applies to the flat rate only. */
+export function monthBill(p: Pick<Project, 'energy' | 'bill'>, kwh: number, fixedCharge = 0): number {
+  const model = tariffModelOf(p);
+  if (model === 'flat') return fixedCharge + Math.max(0, kwh) * p.energy.tariff;
+  return tnbDomesticBill(kwh, { afaSen, touPeakPct: model === 'tnb-tou' ? touPeakPctOf(p) : undefined }).total;
+}
+
+/** Yearly electricity use: from the scanned bill when there is one, else worked back from the monthly bill. */
+export function annualUsageKwh(p: Pick<Project, 'monthlyBill' | 'monthlyKwh' | 'energy' | 'bill'>): number {
+  if (p.monthlyKwh && p.monthlyKwh > 0) return p.monthlyKwh * 12;
+  if (p.monthlyBill <= 0) return 0;
+  const model = tariffModelOf(p);
+  if (model !== 'flat') return tnbKwhForBill(p.monthlyBill, { afaSen, touPeakPct: model === 'tnb-tou' ? touPeakPctOf(p) : undefined }) * 12;
+  return p.energy.tariff > 0 ? (p.monthlyBill * 12) / p.energy.tariff : 0;
+}
+
 export interface BillMonth {
   month: string;
   /** solar generation, kWh */
   solarKwh: number;
   /** electricity used, kWh */
   usageKwh: number;
-  /** usage minus solar; negative = more solar than used (exported) */
-  netKwh: number;
+  /** grid use before solar, kWh (= usage) */
+  gridBeforeKwh: number;
+  /** grid use with solar after using carried credit, kWh */
+  gridAfterKwh: number;
   billBefore: number;
   billAfter: number;
-  /** export credit carried to later months, money */
-  credit: number;
+  /** exported kWh carried to later months */
+  creditKwh: number;
   savings: number;
 }
 
 /**
  * One year of monthly bills with and without solar. Use is spread over the months by their number
- * of days. Solar first covers that month's use; any extra is exported and credited at the same
- * rate against later months' bills in the same year (net metering), and credit left at the end of
- * the year is lost. `fixedCharge` stays on the bill either way, so it doesn't change the savings.
- * With no known use, every kWh of solar counts as a saving.
+ * of days. Solar first covers that month's use; extra solar is exported and its kWh offset grid
+ * use in later months of the same year (net energy metering); credit left at the end of the year
+ * is lost. Each bill is then worked out on the kWh actually bought from the grid, so tariff bands,
+ * the retail charge and AFA waivers and the Energy Efficiency Incentive follow the lower use.
+ * Prices rise by the escalation rate each year. With no known use, every kWh of solar counts as a
+ * saving at the average rate.
  */
 export function billYear(p: Project, monthlyGenKwh: number[], year: number, fixedCharge = 0): BillMonth[] {
   const e = p.energy;
-  const tariff = e.tariff * Math.pow(1 + e.escalation / 100, year - 1);
+  const rise = Math.pow(1 + e.escalation / 100, year - 1);
   const factor = outputFactor(e, year);
   const annualUse = annualUsageKwh(p);
-  let credit = 0;
+  let creditKwh = 0;
   return monthlyGenKwh.map((g0, m) => {
     const solarKwh = g0 * factor;
     if (annualUse <= 0) {
-      const savings = solarKwh * tariff;
-      return { month: MONTHS[m], solarKwh, usageKwh: 0, netKwh: -solarKwh, billBefore: fixedCharge, billAfter: fixedCharge - savings, credit: 0, savings };
+      const savings = solarKwh * e.tariff * rise;
+      return { month: MONTHS[m], solarKwh, usageKwh: 0, gridBeforeKwh: 0, gridAfterKwh: 0, billBefore: 0, billAfter: 0, creditKwh: 0, savings };
     }
     const usageKwh = (annualUse * DAYS[m]) / 365;
-    const netKwh = usageKwh - solarKwh;
-    const billBefore = fixedCharge + usageKwh * tariff;
-    let billAfter = fixedCharge;
-    if (netKwh >= 0) {
-      const cost = netKwh * tariff;
-      const used = Math.min(credit, cost);
-      credit -= used;
-      billAfter += cost - used;
+    let gridAfterKwh = usageKwh - solarKwh;
+    if (gridAfterKwh < 0) {
+      creditKwh += -gridAfterKwh;
+      gridAfterKwh = 0;
     } else {
-      credit += -netKwh * tariff;
+      const used = Math.min(creditKwh, gridAfterKwh);
+      creditKwh -= used;
+      gridAfterKwh -= used;
     }
-    return { month: MONTHS[m], solarKwh, usageKwh, netKwh, billBefore, billAfter, credit, savings: billBefore - billAfter };
+    const billBefore = monthBill(p, usageKwh, fixedCharge) * rise;
+    const billAfter = monthBill(p, gridAfterKwh, fixedCharge) * rise;
+    return { month: MONTHS[m], solarKwh, usageKwh, gridBeforeKwh: usageKwh, gridAfterKwh, billBefore, billAfter, creditKwh, savings: billBefore - billAfter };
   });
 }
 

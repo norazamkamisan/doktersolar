@@ -47,6 +47,7 @@ export const DEFAULT_SETTINGS: Settings = {
   ].join('\n'),
   caseStudies: [],
   fixedCharge: 10,
+  afaSen: 3.6,
 };
 
 export function defaultDesign(s: Settings): DesignSettings {

@@ -3,6 +3,7 @@ import type { DesignSettings, EnergySettings, Project, Settings } from '../types
 import { DEFAULT_SETTINGS, defaultDesign, defaultEnergy, normalizeProject, withComputed } from './defaults';
 import { buildSeedProjects } from './seed';
 import { noteProjectChanges, noteSettingsChange, startSync } from './sync';
+import { setAfaSen } from './solar';
 
 export { DEFAULT_SETTINGS };
 
@@ -32,6 +33,7 @@ function write(key: string, value: unknown): void {
 }
 
 let settings: Settings = { ...DEFAULT_SETTINGS, ...(read<Partial<Settings>>(SETTINGS_KEY) ?? {}) };
+setAfaSen(settings.afaSen);
 const normalize = (list: Project[]) => list.map(normalizeProject);
 let projects: Project[] = normalize(read<Project[]>(PROJECTS_KEY) ?? buildSeedProjects(settings));
 if (!localStorage.getItem(PROJECTS_KEY)) write(PROJECTS_KEY, projects);
@@ -46,7 +48,10 @@ const subscribe = (l: () => void) => {
 // keep multiple tabs in sync
 window.addEventListener('storage', (e) => {
   if (e.key === PROJECTS_KEY) projects = normalize(read<Project[]>(PROJECTS_KEY) ?? []);
-  if (e.key === SETTINGS_KEY) settings = { ...DEFAULT_SETTINGS, ...(read<Partial<Settings>>(SETTINGS_KEY) ?? {}) };
+  if (e.key === SETTINGS_KEY) {
+    settings = { ...DEFAULT_SETTINGS, ...(read<Partial<Settings>>(SETTINGS_KEY) ?? {}) };
+    setAfaSen(settings.afaSen);
+  }
   emit();
 });
 
@@ -143,6 +148,7 @@ export function deleteProject(id: string): void {
 
 export function updateSettings(patch: Partial<Settings>): void {
   settings = { ...settings, ...patch };
+  setAfaSen(settings.afaSen);
   write(SETTINGS_KEY, settings);
   noteSettingsChange();
   emit();
@@ -179,6 +185,7 @@ export function removeProjectsWithPrefix(prefix: string): number {
 
 export function resetDemoData(): void {
   settings = { ...DEFAULT_SETTINGS };
+  setAfaSen(settings.afaSen);
   write(SETTINGS_KEY, settings);
   noteSettingsChange();
   commitProjects(buildSeedProjects(settings));
@@ -193,6 +200,7 @@ startSync({
     write(PROJECTS_KEY, projects);
     if (nextSettings) {
       settings = { ...DEFAULT_SETTINGS, ...nextSettings };
+      setAfaSen(settings.afaSen);
       write(SETTINGS_KEY, settings);
     }
     emit();

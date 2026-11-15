@@ -107,7 +107,11 @@ export default function SettingsPage() {
             </div>
             <NumberField label="Default panel wattage" suffix="W" value={s.defaultPanelWattage} min={50} onChange={(v) => updateSettings({ defaultPanelWattage: v })} />
             <NumberField label="Price per watt (installed)" suffix={`${s.currency}/W`} value={s.pricePerWatt} min={0} step={0.05} onChange={(v) => updateSettings({ pricePerWatt: v })} />
-            <NumberField label="Electricity tariff" suffix={`${s.currency}/kWh`} value={s.tariff} min={0} step={0.01} onChange={(v) => updateSettings({ tariff: v })} />
+            <NumberField label="Average electricity rate" suffix={`${s.currency}/kWh`} value={s.tariff} min={0} step={0.01} onChange={(v) => updateSettings({ tariff: v })} />
+            <div>
+              <NumberField label="TNB AFA rate (update monthly)" suffix="sen/kWh" value={s.afaSen} step={0.01} onChange={(v) => updateSettings({ afaSen: v })} />
+              <p className="mt-1 text-xs text-slate-500">Automatic Fuel Adjustment for the current month, from TNB. Used for every project's bills.</p>
+            </div>
             <NumberField label="Peak sun hours" suffix="h/day" value={s.peakSunHours} min={0} step={0.1} onChange={(v) => updateSettings({ peakSunHours: v })} />
             <NumberField label="Panel length" suffix="m" value={s.defaultPanelLength} min={0.3} step={0.001} onChange={(v) => updateSettings({ defaultPanelLength: v })} />
             <NumberField label="Panel width" suffix="m" value={s.defaultPanelWidth} min={0.3} step={0.001} onChange={(v) => updateSettings({ defaultPanelWidth: v })} />
