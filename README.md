@@ -47,7 +47,7 @@ A solar design and proposal studio: sketch a roof on satellite imagery, auto-fil
 | **Energy & savings** | `kWp × peak sun hours × 365 × 0.8`, or NREL PVWatts if configured. Monthly production chart, tariff, price per watt, degradation (first year, then per year), tariff escalation, payback and 25-year cumulative savings |
 | **Proposal** (`/proposals/:id`) | A4 pages in the style of a company proposal: cover letter, about us, recommended system with map and equipment, system performance and environmental benefits, how solar works, monthly bill savings table, net financial impact, quotation with deposit and payment milestones, quote acceptance, case studies and terms. Company content (cover photo, about us, case studies, terms, payment details, panel/inverter brands, warranties) is set once under **Settings → Proposal**; inverter model and size, price and discount per project on the **Proposal** tab. **Download PDF** makes one PDF page per proposal page; **Share link** puts the proposal data in the URL so it opens on any device |
 | **Leads / Designs / Proposals** | Focused list views |
-| **Sales team** | Add salespeople (name, phone, email) under **Settings → Company → Sales team**, then pick one when creating a project (remembered for the next one) or on the project's **Info** tab. Their details appear as "Prepared by" on the proposal cover, sign-off and footer; without one, the default "Prepared by" in Settings is used |
+| **Sales team & logins** | Add salespeople (name, phone, email) under **Settings → Company → Sales team**; the admin picks one per project (new project form or the **Info** tab), and their details appear as "Prepared by" on the proposal. Give a salesperson a **login ID and password** there and they sign in with it, see and edit **only their own projects**, and their new projects are theirs automatically. See [Sign-in and salesperson logins](#password-protection) |
 | **Install as an app** | The site is an installable web app: **Install app** in the menu (Chrome, Edge, Android) or Safari → Share → **Add to Home Screen** (iPhone, iPad). It then opens from its own icon in its own window. Data is the same as on the website (Google Drive) |
 | **Settings** | Company name, contact, logo upload (stored as base64), default panel wattage and size, price per watt, tariff, peak sun hours, degradation and currency. **Equipment & warranties** (panel product and performance warranty, inverter and its warranty) appear in every proposal's system details. You can also reset to the demo data |
 | **Scan a TNB bill** (New Project, Info tab) | Choose a TNB bill PDF (residential, commercial or factory) and it's read in the browser, with nothing uploaded. Account, tariff, addresses, billing period, kWh used, every charge line, meter readings, maximum demand, NEM details and the past months' usage come across. The app works out the average use and the rate actually paid, then sizes a system (100% of use for homes, 80% for shops, 70% for factories, editable; shops and factories are capped at the bill's maximum demand) and opens a ready proposal with a "Your electricity today" section |
@@ -62,7 +62,11 @@ Five sample projects in Malaysia are seeded on first load. Default currency is *
 ```
 doktersolar/
 ├─ vercel.json                  # Vercel build + SPA rewrite
-├─ middleware.js                # password login (Vercel Routing Middleware)
+├─ middleware.js                # sign-in gate: checks the session cookie (Vercel Routing Middleware)
+├─ api/login.js                 # sign in: admin (SITE_PASSWORD) or a salesperson's login
+├─ api/users.js                 # salesperson logins (admin only)
+├─ server/session.mjs           # signed sessions, password hashing (PBKDF2)
+├─ server/access.mjs            # who sees and changes what
 ├─ tests/                       # npm test: middleware + data merge rules
 ├─ api/pvwatts.js               # Vercel Function → /api/pvwatts
 ├─ api/data.js                  # Vercel Function → /api/data (shared data in Google Drive)
@@ -191,14 +195,19 @@ vercel --prod
 
 ### Password protection
 
-The app sits behind one shared password, checked on Vercel's servers by [`middleware.js`](middleware.js) before any page or API is served.
+The app sits behind a sign-in, checked on Vercel's servers by [`middleware.js`](middleware.js) before any page or API is served.
+
+- **Admin:** sign in with Login ID left empty (or `admin`) and the site password, `SITE_PASSWORD`. The admin sees everything, changes settings and manages salesperson logins.
+- **Salespeople:** the admin gives each salesperson a login ID and password under **Settings → Company → Sales team**. A salesperson sees and edits only projects assigned to them; their new projects are assigned to them automatically; they can't open Settings. This is enforced by the server ([`server/access.mjs`](server/access.mjs)): `/api/data` only sends their own projects and refuses changes to anyone else's or to settings.
+- **Where logins are kept:** in the Google Drive data file, as salted PBKDF2-SHA256 hashes (never the passwords). They are never sent to the app. Changing a salesperson's password or login ID, or removing it, signs them out everywhere. Salesperson logins need the [Google Drive storage](#shared-data-in-google-drive); without it only the admin password works.
+- **Shared devices:** when a different person signs in on a device, the projects cached in that browser are cleared and reloaded from the server for the new person.
 
 - **Set the password:** go to **Project → Settings → Environment Variables** and add `SITE_PASSWORD` as a **Secret** for Production (and Preview if you want previews protected too), then redeploy. Use a long password. There's no lockout, only a short delay after each wrong guess.
 - **If it's missing, the site stays closed:** without `SITE_PASSWORD` the app shows "Login isn't set up yet" instead of opening to everyone.
 - **What stays public:** shared proposal links (`/proposals/<id>`) open without a password so customers can view them. The `/proposals` list, every other page and `/api/pvwatts` need a sign-in.
-- **Sessions:** signing in sets a signed, HttpOnly cookie for 30 days. **Sign out** is at the bottom of the sidebar. Changing `SITE_PASSWORD` signs everyone out.
+- **Sessions:** signing in sets a signed, HttpOnly cookie for 30 days naming the role and user. **Sign out** is at the bottom of the sidebar. Changing `SITE_PASSWORD` signs everyone out, salespeople included.
 - **Local development:** `npm run dev` and `npm run preview` don't run the middleware, so no password is needed locally.
-- **Tests:** `npm test` checks the middleware: redirects, sessions, wrong passwords, open-redirect protection and the closed-by-default behaviour. The GitHub build runs these tests too.
+- **Tests:** `npm test` checks the middleware (redirects, sessions, wrong passwords, open-redirect protection, closed by default) and the logins against a fake Google Drive (who sees which projects, refused changes, password changes signing people out). The GitHub build runs these tests too.
 
 Vercel's own "Password Protection" is a paid Pro feature. This middleware does the same job on the free Hobby plan.
 

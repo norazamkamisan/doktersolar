@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, Loader2, X } from 'lucide-react';
 import { createProject, useSettings } from '../lib/store';
 import { SalespersonSelect, lastSalespersonId, rememberSalesperson } from './Salespeople';
+import { useMe } from '../lib/sync';
 import { geocode } from '../lib/api';
 import { NAME_HIDDEN, type BillCategory, type TnbBill } from '../lib/tnbBill';
 import { DEFAULT_TARGET_OFFSET, analyseBill, billProjectFields } from '../lib/billAnalysis';
@@ -12,6 +13,7 @@ export default function NewProjectModal({ onClose }: { onClose: () => void }) {
   const settings = useSettings();
   const navigate = useNavigate();
   const [form, setForm] = useState({ customerName: '', email: '', phone: '', address: '', monthlyBill: '' });
+  const me = useMe();
   const [salespersonId, setSalespersonId] = useState(() => lastSalespersonId(settings));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -76,9 +78,10 @@ export default function NewProjectModal({ onClose }: { onClose: () => void }) {
       monthlyBill: Number(form.monthlyBill) || 0,
       lat: loc?.lat ?? null,
       lng: loc?.lng ?? null,
-      salespersonId: salespersonId || undefined,
+      // a salesperson's own projects are always theirs
+      salespersonId: me.role === 'sales' ? me.salespersonId ?? undefined : salespersonId || undefined,
     });
-    rememberSalesperson(salespersonId);
+    if (me.role === 'admin') rememberSalesperson(salespersonId);
     setBusy(false);
     onClose();
     navigate(`/projects/${p.id}/${fromBill ? 'proposal' : 'design'}`);
@@ -164,7 +167,7 @@ export default function NewProjectModal({ onClose }: { onClose: () => void }) {
               onChange={set('monthlyBill')}
             />
           </div>
-          {(settings.salespeople ?? []).length > 0 && (
+          {me.role === 'admin' && (settings.salespeople ?? []).length > 0 && (
             <div className="sm:col-span-2">
               <SalespersonSelect id="np-salesperson" settings={settings} value={salespersonId} onChange={setSalespersonId} />
             </div>

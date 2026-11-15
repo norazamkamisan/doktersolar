@@ -4,20 +4,23 @@
 // never served without a valid session. Set SITE_PASSWORD in Vercel → Project →
 // Settings → Environment Variables. Changing it signs everyone out.
 //
+// Signing in happens in api/login.js: the admin with SITE_PASSWORD, salespeople with their own
+// login ID and password. Sessions are checked here (server/session.mjs); what each user may see
+// is enforced by the API functions (server/access.mjs).
+//
 // Public without a password:
 //   /proposals/<id>   shared customer proposal links
 //   /assets/*, /favicon.svg, /_vercel/*   static files and Vercel analytics
 //   /manifest.webmanifest, /icons/*        app install details and icons (phones fetch them without the cookie)
+//   /api/login                             the sign-in form posts here (api/login.js)
 //
 // Not run by `npm run dev` / `vite preview`; local development stays open.
 
 import { next } from '@vercel/functions';
+import { clearCookie, createSession, readCookie, safeNext, verifySession } from './server/session.mjs';
 
-const COOKIE = 'ds_session';
-const MAX_AGE = 60 * 60 * 24 * 30; // 30 days
-const FAILED_LOGIN_DELAY_MS = 800; // slows down password guessing
-
-const enc = new TextEncoder();
+// re-exported for the tests
+export { createSession, safeNext, verifySession };
 
 /* ------------------------------------------------------------------ */
 /* Routing                                                             */
@@ -31,15 +34,9 @@ export function isPublicPath(path) {
     path === '/manifest.webmanifest' ||
     path.startsWith('/icons/') ||
     path === '/robots.txt' ||
+    path === '/api/login' ||
     /^\/proposals\/[^/]+\/?$/.test(path) // a single shared proposal, not the /proposals list
   );
-}
-
-/** Only allow same-site relative paths as post-login destinations. */
-export function safeNext(value) {
-  if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//') || value.startsWith('/\\')) return '/home';
-  if (value.startsWith('/login') || value.startsWith('/logout') || value.startsWith('/api/')) return '/home';
-  return value;
 }
 
 export default async function middleware(request) {
@@ -51,16 +48,13 @@ export default async function middleware(request) {
   const password = process.env.SITE_PASSWORD;
   if (!password) return notConfigured(path); // fail closed
 
-  if (path === '/api/login') {
-    return request.method === 'POST' ? login(request, password) : text(405, 'Method not allowed');
-  }
   if (path === '/logout') return logout();
 
-  const authed = await hasValidSession(request, password);
+  const authed = !!(await verifySession(readCookie(request), password));
 
   if (path === '/login') {
     if (authed) return redirect(safeNext(url.searchParams.get('next')));
-    return loginPage({ next: safeNext(url.searchParams.get('next')), error: url.searchParams.has('error') });
+    return loginPage({ next: safeNext(url.searchParams.get('next')), error: url.searchParams.get('error') });
   }
 
   if (authed) return next();
@@ -75,79 +69,11 @@ export default async function middleware(request) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Sessions: "v1.<expiry>.<HMAC-SHA256(password, expiry)>"             */
-/* ------------------------------------------------------------------ */
-
-function b64url(buf) {
-  let s = '';
-  for (const b of new Uint8Array(buf)) s += String.fromCharCode(b);
-  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-async function hmac(key, message) {
-  const k = await crypto.subtle.importKey('raw', enc.encode(key), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  return b64url(await crypto.subtle.sign('HMAC', k, enc.encode(message)));
-}
-
-function safeEqual(a, b) {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
-
-export async function createSession(password, now = Date.now()) {
-  const exp = Math.floor(now / 1000) + MAX_AGE;
-  return `v1.${exp}.${await hmac(password, `ds-session.v1.${exp}`)}`;
-}
-
-export async function verifySession(token, password, now = Date.now()) {
-  const [v, expStr, sig] = (token ?? '').split('.');
-  const exp = Number(expStr);
-  if (v !== 'v1' || !sig || !Number.isFinite(exp) || exp * 1000 <= now) return false;
-  return safeEqual(sig, await hmac(password, `ds-session.v1.${exp}`));
-}
-
-function readCookie(request, name) {
-  for (const part of (request.headers.get('cookie') ?? '').split(';')) {
-    const i = part.indexOf('=');
-    if (i > -1 && part.slice(0, i).trim() === name) return part.slice(i + 1).trim();
-  }
-  return null;
-}
-
-async function hasValidSession(request, password) {
-  return verifySession(readCookie(request, COOKIE), password);
-}
-
-async function passwordMatches(input, password) {
-  // Compare MACs rather than raw strings, so timing doesn't leak the password.
-  const [a, b] = await Promise.all([hmac('ds-login-check', String(input)), hmac('ds-login-check', password)]);
-  return safeEqual(a, b);
-}
-
-/* ------------------------------------------------------------------ */
 /* Handlers                                                            */
 /* ------------------------------------------------------------------ */
 
-async function login(request, password) {
-  let form;
-  try {
-    form = await request.formData();
-  } catch {
-    return text(400, 'Bad request');
-  }
-  const dest = safeNext(form.get('next'));
-  if (!(await passwordMatches(form.get('password') ?? '', password))) {
-    await new Promise((r) => setTimeout(r, FAILED_LOGIN_DELAY_MS));
-    return redirect(`/login?error=1&next=${encodeURIComponent(dest)}`);
-  }
-  const token = await createSession(password);
-  return redirect(dest, { 'Set-Cookie': `${COOKIE}=${token}; Path=/; Max-Age=${MAX_AGE}; HttpOnly; Secure; SameSite=Lax` });
-}
-
 function logout() {
-  return redirect('/login', { 'Set-Cookie': `${COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax` });
+  return redirect('/login', { 'Set-Cookie': clearCookie() });
 }
 
 function redirect(location, extra = {}) {
@@ -230,17 +156,23 @@ function page(title, body) {
 }
 
 function loginPage({ next: dest, error }) {
+  const message =
+    error === 'unavailable'
+      ? 'Sign-in is unavailable right now (the data store couldn’t be reached). Please try again shortly.'
+      : 'That login ID or password isn’t right. Please try again.';
   return html(
     error ? 401 : 200,
     page(
       'Sign in',
       `<h1>Sign in</h1>
-       <p class="muted">Enter the password to open the DokterSolar workspace.</p>
-       ${error ? '<p class="error" role="alert">That password isn’t right. Please try again.</p>' : ''}
+       <p class="muted">Salespeople: use the login ID and password from your admin. Admin: leave Login ID empty (or type admin) and use the site password.</p>
+       ${error ? `<p class="error" role="alert">${message}</p>` : ''}
        <form method="post" action="/api/login">
          <input type="hidden" name="next" value="${escapeHtml(dest)}">
+         <label for="loginId">Login ID</label>
+         <input id="loginId" name="loginId" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" style="margin-bottom:14px">
          <label for="password">Password</label>
-         <input id="password" name="password" type="password" autocomplete="current-password" required autofocus>
+         <input id="password" name="password" type="password" autocomplete="current-password" required>
          <button type="submit">Sign in</button>
        </form>
        <p class="foot">Shared proposal links open without a password.</p>`,

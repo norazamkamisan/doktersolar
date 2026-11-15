@@ -2,21 +2,23 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import middleware, { createSession, isPublicPath, safeNext, verifySession } from '../middleware.js';
+import { POST as loginPost } from '../api/login.js';
 
 const PASSWORD = 'test-password-for-unit-tests';
 const SITE = 'https://doktersolar.example';
 
 const isPassThrough = (res) => res.headers.get('x-middleware-next') === '1';
 const get = (path, cookie) => middleware(new Request(SITE + path, { headers: cookie ? { cookie } : {} }));
+// signing in is handled by api/login.js (the middleware lets /api/login through)
 const postLogin = (password, next = '/home') =>
-  middleware(new Request(SITE + '/api/login', { method: 'POST', body: new URLSearchParams({ password, next }) }));
+  loginPost(new Request(SITE + '/api/login', { method: 'POST', body: new URLSearchParams({ password, next }) }));
 
 beforeEach(() => {
   process.env.SITE_PASSWORD = PASSWORD;
 });
 
 test('public paths pass through without a session', async () => {
-  for (const path of ['/proposals/demo-3', '/proposals/demo-3/', '/assets/index-abc.js', '/favicon.svg', '/_vercel/insights/script.js', '/manifest.webmanifest', '/icons/icon-192.png']) {
+  for (const path of ['/proposals/demo-3', '/proposals/demo-3/', '/assets/index-abc.js', '/favicon.svg', '/_vercel/insights/script.js', '/manifest.webmanifest', '/icons/icon-192.png', '/api/login']) {
     assert.ok(isPassThrough(await get(path)), path);
   }
 });
@@ -45,6 +47,7 @@ test('login page renders with the escaped destination', async () => {
   assert.equal(res.status, 200);
   const body = await res.text();
   assert.match(body, /name="password"/);
+  assert.match(body, /name="loginId"/);
   assert.doesNotMatch(body, /<script>/); // unsafe "next" values are replaced with /home
 });
 
@@ -83,12 +86,12 @@ test('logout clears the cookie', async () => {
 
 test('sessions are rejected when tampered with, expired, or the password changes', async () => {
   const token = await createSession(PASSWORD);
-  assert.equal(await verifySession(token, PASSWORD), true);
-  assert.equal(await verifySession(token.slice(0, -2) + 'xx', PASSWORD), false);
-  assert.equal(await verifySession(token, 'a-new-password'), false);
-  assert.equal(await verifySession(token, PASSWORD, Date.now() + 31 * 24 * 3600 * 1000), false);
-  assert.equal(await verifySession('garbage', PASSWORD), false);
-  assert.equal(await verifySession(null, PASSWORD), false);
+  assert.deepEqual(await verifySession(token, PASSWORD), { role: 'admin', userId: '', version: '' });
+  assert.equal(await verifySession(token.slice(0, -2) + 'xx', PASSWORD), null);
+  assert.equal(await verifySession(token, 'a-new-password'), null);
+  assert.equal(await verifySession(token, PASSWORD, Date.now() + 31 * 24 * 3600 * 1000), null);
+  assert.equal(await verifySession('garbage', PASSWORD), null);
+  assert.equal(await verifySession(null, PASSWORD), null);
 });
 
 test('open-redirect attempts fall back to /home', () => {
@@ -101,6 +104,7 @@ test('open-redirect attempts fall back to /home', () => {
 test('without SITE_PASSWORD the site fails closed', async () => {
   delete process.env.SITE_PASSWORD;
   assert.equal((await get('/home')).status, 503);
+  assert.equal((await postLogin('anything')).status, 503);
   assert.equal((await get('/api/pvwatts')).status, 503);
   assert.ok(isPassThrough(await get('/proposals/demo-3'))); // shared proposals still work
 });

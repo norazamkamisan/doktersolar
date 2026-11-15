@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/middleware.test.mjs tests/data-merge.test.mjs tests/tnb-tariff.test.mjs",
+    "test": "node --test tests/middleware.test.mjs tests/data-merge.test.mjs tests/tnb-tariff.test.mjs tests/logins.test.mjs",
     "screenshots": "node scripts/screenshots.mjs",
     "preview": "vite preview"
   },
