@@ -75,6 +75,7 @@ export function planImport(text: string, projects: Project[], settings: Settings
         sstPct: pct(info.tax ?? 0.08),
         priceFrom: n(info.fixedPrice) > 0 ? 'proposal' : 'markup',
         scenarios: Array.isArray(q.scenarios) && q.scenarios.length ? q.scenarios.map((s: Any) => ({ name: str(s.name), markupPct: pct(s.markup) })) : DEFAULT_SCENARIOS,
+        ...(info.targetMargin == null || info.targetMargin === '' ? {} : { targetMarginPct: pct(info.targetMargin) }),
       },
     });
   }
