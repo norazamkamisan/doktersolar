@@ -128,6 +128,7 @@ export function planImport(text: string, projects: Project[], settings: Settings
       category: str(r.cat) || 'Others',
       description: str(r.desc),
       amount: n(r.amt),
+      ...(r.status ? { status: status(r.status) } : {}),
       method: str(r.method),
       remarks: str(r.remarks),
     });
