@@ -26,6 +26,8 @@ const FONT = 'Arial, "Helvetica Neue", Helvetica, system-ui, sans-serif';
 
 const GAMA = {
   name: 'GAMA ENERGY SDN BHD',
+  /** Gama Energy is PSP Group's SEDA-registered solar PV investor (RPVI) */
+  tagline: 'Pelabur Solar PV Berdaftar SEDA (RPVI) · PSP Group of Companies',
   phone: '06-765 5666',
   whatsapp: '+60116299-7515 (WhatsApp sahaja)',
   email: 'info@mygamaenergy.com',
@@ -107,6 +109,7 @@ function Cover({ split, photo, forExport, children }: { split: number; photo: st
         <p className="text-[10px] font-bold" style={{ color: GOLD }}>
           {GAMA.name}
         </p>
+        <p className="mt-1 text-[9px] text-white/80">{GAMA.tagline}</p>
         {children}
       </div>
     </Slide>
@@ -258,7 +261,7 @@ const ZeroCapexProposal = forwardRef<HTMLElement, { project: Project; forExport?
         </table>
         <div className="absolute space-y-2.5 text-[10.5px] leading-snug" style={{ left: 30, top: 392, width: 596 }}>
           <p>
-            <strong>Tanpa modal awal:</strong> pelabur menanggung kos sistem, pemasangan dan O&amp;M. Pelanggan membayar kadar solar tetap bagi tenaga solar
+            <strong>Tanpa modal awal:</strong> <strong>Gama Energy (RPVI berdaftar SEDA)</strong> menanggung kos sistem, pemasangan dan O&amp;M. Pelanggan membayar kadar solar tetap bagi tenaga solar
             yang digunakan sahaja. Penjimatan = (caj tenaga TNB − kadar solar) × kWh solar, ditambah AFA dan KWTBB.
           </p>
           <p>
