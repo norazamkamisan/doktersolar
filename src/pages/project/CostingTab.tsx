@@ -10,7 +10,7 @@ import {
   calcCosting,
   categoryColor,
   costingOf,
-  marginLevel,
+  marginVsTarget,
   newRowId,
 } from '../../lib/costing';
 import { NumCell, SelectCell, TextCell, DeleteCell, KpiTile } from '../../components/Cells';
@@ -31,7 +31,7 @@ export default function CostingTab({ project: p }: { project: Project }) {
   const c = costingOf(p, s);
   const r = useMemo(() => calcCosting(p, s), [p, s]);
   const rm = (v: number) => money(v, cur, 2);
-  const level = marginLevel(r.margin);
+  const { level, label: marginLabel } = marginVsTarget(r.margin, c.targetMarginPct);
   const fixed = r.fixedMarkup !== null;
 
   const setItem = (id: string, patch: Partial<CostItem>) =>
@@ -90,10 +90,28 @@ export default function CostingTab({ project: p }: { project: Project }) {
           tone={level === 'good' ? 'green' : level === 'bad' ? 'red' : 'amber'}
           label="Profit Margin"
           value={pct(r.margin)}
-          sub={level === 'good' ? 'Healthy (≥15%)' : level === 'bad' ? 'Too thin (<10%)' : 'Watch (10–15%)'}
+          sub={marginLabel}
         />
       </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <div className="card px-4 py-3">
+          <label htmlFor="target-margin" className="text-xs text-slate-500">Target margin %</label>
+          <div className="flex items-center gap-1">
+            <input
+              id="target-margin"
+              className="input h-8 w-full px-2 py-1 text-lg font-semibold tabular-nums"
+              type="number"
+              inputMode="decimal"
+              step="any"
+              min={0}
+              max={100}
+              placeholder="15"
+              value={c.targetMarginPct ?? ''}
+              onChange={(e) => patchCosting(p, s, { targetMarginPct: e.target.value === '' ? undefined : Number(e.target.value) })}
+            />
+            <span className="text-slate-500">%</span>
+          </div>
+        </div>
         {[
           ['Cost items', String(r.rows.filter((x) => x.description.trim() || x.direct).length)],
           ['Avg markup', pct(r.avgMarkup)],
@@ -307,7 +325,7 @@ export default function CostingTab({ project: p }: { project: Project }) {
                     <td className="whitespace-nowrap px-2 py-1 text-right tabular-nums">{rm(x.final)}</td>
                     <td className="whitespace-nowrap px-2 py-1 text-right tabular-nums">{rm(x.profit)}</td>
                     <td className="px-2 py-1 text-right">
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${MARGIN_STYLE[marginLevel(x.margin)]}`}>{pct(x.margin)}</span>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${MARGIN_STYLE[marginVsTarget(x.margin, c.targetMarginPct).level]}`}>{pct(x.margin)}</span>
                     </td>
                   </tr>
                 ))}

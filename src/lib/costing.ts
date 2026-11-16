@@ -153,6 +153,18 @@ export function marginLevel(m: number): 'good' | 'warn' | 'bad' {
   return m < 0.1 ? 'bad' : m >= 0.15 ? 'good' : 'warn';
 }
 
+/** Margin against the project's own target when it has one, else the 15% rule. */
+export function marginVsTarget(m: number, targetPct?: number | null): { level: 'good' | 'warn' | 'bad'; label: string } {
+  if (targetPct == null || !Number.isFinite(targetPct)) {
+    const level = marginLevel(m);
+    return { level, label: level === 'good' ? 'Healthy (≥15%)' : level === 'bad' ? 'Too thin (<10%)' : 'Watch (10–15%)' };
+  }
+  const t = targetPct / 100;
+  if (m >= t) return { level: 'good', label: `On target (≥${targetPct}%)` };
+  const gap = Math.round((t - m) * 1000) / 10;
+  return { level: m < 0.1 ? 'bad' : 'warn', label: `Below ${targetPct}% target by ${gap} pts` };
+}
+
 export const MARGIN_STYLE = {
   good: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
   warn: 'bg-amber-50 text-amber-800 ring-amber-200',

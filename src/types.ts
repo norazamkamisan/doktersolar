@@ -246,6 +246,8 @@ export interface ProjectCosting {
    */
   priceFrom: 'proposal' | 'markup';
   scenarios: CostScenario[];
+  /** the margin this job should make, %; not set = the 15% rule */
+  targetMarginPct?: number;
 }
 
 export const PAY_STATUSES = ['Not Paid', 'Partial', 'Paid', 'Overdue', 'Hold', 'Cancelled'] as const;
