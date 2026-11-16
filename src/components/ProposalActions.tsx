@@ -5,6 +5,8 @@ import type { Project } from '../types';
 import { shareProposal } from '../lib/api';
 import { PDF_FONT_STACK, PDF_RENDER_WIDTH, downloadProposalPdf, proposalFileName, waitForRender } from '../lib/pdf';
 import ProposalDocument, { type DocSettings } from './ProposalDocument';
+import { SLIDE_W } from './ZeroCapexProposal';
+import { isZeroCapexProject } from '../lib/zeroCapexProject';
 
 /**
  * Share link + Print + Download PDF buttons for a proposal.
@@ -104,7 +106,7 @@ function PdfExport({ project, settings, onDone }: { project: Project; settings: 
         position: 'fixed',
         left: -20000,
         top: 0,
-        width: PDF_RENDER_WIDTH,
+        width: isZeroCapexProject(project) ? SLIDE_W : PDF_RENDER_WIDTH,
         fontFamily: PDF_FONT_STACK,
         pointerEvents: 'none',
         background: '#fff',

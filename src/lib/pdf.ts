@@ -36,12 +36,13 @@ export async function waitForRender(root: HTMLElement, timeoutMs = 10000): Promi
 export async function downloadProposalPdf(article: HTMLElement, fileName: string): Promise<void> {
   const [{ toJpeg }, { jsPDF }] = await Promise.all([import('html-to-image'), import('jspdf')]);
 
-  const PAGE_W = 210;
-  const PAGE_H = 297;
-  const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
-
-  // Each [data-pdf-page] element is laid out at A4 size (see ProposalDocument) and becomes one page.
+  // Each [data-pdf-page] element becomes one page: A4 portrait for the standard proposal,
+  // a 16:9 slide (13.33 × 7.5 in) for the Zero Capex deck.
   const pages = Array.from(article.querySelectorAll<HTMLElement>('[data-pdf-page]'));
+  const sizeOf = (el: HTMLElement): [number, number] => (el.offsetWidth > el.offsetHeight ? [338.67, 190.5] : [210, 297]);
+  const first = pages[0] ? sizeOf(pages[0]) : ([210, 297] as [number, number]);
+  const pdf = new jsPDF({ unit: 'mm', format: first, orientation: first[0] > first[1] ? 'landscape' : 'portrait', compress: true });
+
   for (let i = 0; i < pages.length; i++) {
     const page = pages[i];
     const width = page.offsetWidth;
@@ -55,8 +56,9 @@ export async function downloadProposalPdf(article: HTMLElement, fileName: string
       backgroundColor: '#ffffff',
       skipFonts: true, // the off-screen copy uses system fonts, so nothing needs embedding
     });
-    if (i > 0) pdf.addPage();
-    // fit the page image to A4 (it already has A4 proportions)
+    const [PAGE_W, PAGE_H] = sizeOf(page);
+    if (i > 0) pdf.addPage([PAGE_W, PAGE_H], PAGE_W > PAGE_H ? 'landscape' : 'portrait');
+    // fit the page image to the page (it already has the page's proportions)
     const scale = Math.min(PAGE_W / width, PAGE_H / height);
     const w = width * scale;
     const h = height * scale;
