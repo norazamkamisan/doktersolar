@@ -106,4 +106,25 @@
   .leaflet-control-container {
     display: none;
   }
+  /* Zero Capex deck: one 16:9 slide per landscape page, unscaled */
+  @page slide {
+    size: 338.67mm 190.5mm;
+    margin: 0;
+  }
+  .zc-slide-outer {
+    height: auto !important;
+    max-width: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+  }
+  .zc-slide {
+    page: slide;
+    transform: none !important;
+    zoom: 1.333;
+    break-after: page;
+  }
+  [data-proposal] > .zc-slide-outer:last-child .zc-slide {
+    break-after: auto;
+  }
 }

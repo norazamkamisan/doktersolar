@@ -6,6 +6,7 @@ import { date } from '../../lib/format';
 import ProposalDocument from '../../components/ProposalDocument';
 import ProposalActions from '../../components/ProposalActions';
 import QuoteEditor from '../../components/QuoteEditor';
+import { isZeroCapexProject } from '../../lib/zeroCapexProject';
 
 export default function ProposalTab({ project: p }: { project: Project }) {
   const settings = useSettings();
@@ -36,7 +37,14 @@ export default function ProposalTab({ project: p }: { project: Project }) {
           <ProposalActions project={p} settings={settings} compact />
         </div>
       </div>
-      <QuoteEditor project={p} settings={settings} />
+      {isZeroCapexProject(p) ? (
+        <p className="card border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+          <strong>Zero Capex C&amp;I proposal.</strong> This is a commercial or industrial TNB bill of RM10,000 a month or more, so the proposal is the
+          Zero Capex deck. The savings are worked out with the Zero Capex financial model. Bills under RM10,000 get the standard proposal.
+        </p>
+      ) : (
+        <QuoteEditor project={p} settings={settings} />
+      )}
       <ProposalDocument project={p} settings={settings} />
     </div>
   );

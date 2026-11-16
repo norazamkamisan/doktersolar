@@ -25,6 +25,8 @@ import SolarMap from './SolarMap';
 import environmentPhoto from '../assets/environment.jpg';
 import coverPhoto from '../assets/cover.jpg';
 import { LogoMark } from './Logo';
+import ZeroCapexProposal from './ZeroCapexProposal';
+import { isZeroCapexProject } from '../lib/zeroCapexProject';
 import { AnnualSavingsChart, BillCompareChart, CumulativeBillSavingsChart, CumulativeNetChart, DailyGenUseChart, GREEN } from './ProposalCharts';
 
 export type DocSettings = Omit<Settings, 'logo' | 'coverImage' | 'caseStudies'> & Partial<Pick<Settings, 'logo' | 'coverImage' | 'caseStudies'>>;
@@ -136,7 +138,7 @@ function Flow({ title, mode }: { title: string; mode: 'excess' | 'partial' | 'ni
  * `forExport`: fixed A4 page size and desktop layout, for the off-screen copy that becomes the
  * downloaded PDF (each page becomes one PDF page, see lib/pdf.ts).
  */
-const ProposalDocument = forwardRef<HTMLElement, { project: Project; settings: DocSettings; forExport?: boolean }>(function ProposalDocument(
+const StandardProposal = forwardRef<HTMLElement, { project: Project; settings: DocSettings; forExport?: boolean }>(function StandardProposal(
   { project: p, settings: docSettings, forExport = false },
   ref,
 ) {
@@ -714,6 +716,19 @@ const ProposalDocument = forwardRef<HTMLElement, { project: Project; settings: D
         </section>
       ))}
     </article>
+  );
+});
+
+
+/**
+ * The proposal for a project: the Zero Capex C&I deck for scanned Commercial / Industrial bills of
+ * RM10,000 a month and more (see isZeroCapexProject), else the standard cash-purchase proposal.
+ */
+const ProposalDocument = forwardRef<HTMLElement, { project: Project; settings: DocSettings; forExport?: boolean }>(function ProposalDocument(props, ref) {
+  return isZeroCapexProject(props.project) ? (
+    <ZeroCapexProposal ref={ref} project={props.project} forExport={props.forExport} />
+  ) : (
+    <StandardProposal ref={ref} {...props} />
   );
 });
 
