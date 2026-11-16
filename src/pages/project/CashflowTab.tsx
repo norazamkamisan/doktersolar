@@ -4,7 +4,7 @@ import { PAY_STATUSES, PRIORITIES } from '../../types';
 import { updateProject, useSettings } from '../../lib/store';
 import { money } from '../../lib/format';
 import { cashflowOf, newRowId, todayIso } from '../../lib/costing';
-import { balanceOf, daysOverdue, summarize } from '../../lib/cashflow';
+import { balanceOf, cashInStatusPatch, cashOutStatus, daysOverdue, summarize } from '../../lib/cashflow';
 import { DateCell, DeleteCell, KpiTile, NumCell, SelectCell, TextCell } from '../../components/Cells';
 
 type Kind = keyof ProjectCashflow;
@@ -33,8 +33,8 @@ export default function CashflowTab({ project: p }: { project: Project }) {
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <KpiTile tone="green" label="Cash in" value={rm(sum.cashIn)} sub="received from customer" />
-        <KpiTile tone="red" label="Cash out" value={rm(sum.cashOut)} sub="paid out" />
+        <KpiTile tone="green" label="Cash in" value={rm(sum.cashIn)} sub="received (Paid rows only)" />
+        <KpiTile tone="red" label="Cash out" value={rm(sum.cashOut)} sub="paid out (Paid rows only)" />
         <KpiTile tone="blue" label="Net cashflow" value={rm(sum.net)} sub={sum.net >= 0 ? 'POSITIVE' : 'NEGATIVE'} />
         <KpiTile tone="violet" label="Receivable" value={rm(sum.receivable)} sub="still to collect" />
         <KpiTile tone="orange" label="Payable" value={rm(sum.payable)} sub="still to pay" />
@@ -147,7 +147,7 @@ function CashIn({ project: p, rows, settings: s }: { project: Project; rows: Cas
   const set = (id: string, patch: Partial<CashInRow>) => editRow(p, 'cashIn', id, patch);
   const add = () => patchCash(p, 'cashIn', (r) => [...r, { id: newRowId(), date: todayIso(), ref: '', received: 0, outstanding: 0, status: 'Not Paid', remarks: '' }]);
   return (
-    <Section title="Cash in" sub={`Money from ${p.customerName}: deposit, progress claims, final payment, VO.`} onAdd={add} addLabel="Add cash in">
+    <Section title="Cash in" sub={`Money from ${p.customerName}: deposit, progress claims, final payment, VO. Only rows marked Paid count as cash received; Not Paid amounts are still to collect.`} onAdd={add} addLabel="Add cash in">
       <table className="w-full text-sm">
         <Head cols={['Date received / expected', 'Claim / milestone', 'Received', 'Outstanding', 'Status', 'Remarks', '']} right={[2, 3]} />
         <tbody className="divide-y divide-slate-100">
@@ -157,7 +157,7 @@ function CashIn({ project: p, rows, settings: s }: { project: Project; rows: Cas
               <td className="px-1 py-1"><TextCell className="min-w-[180px]" label={`Claim ${i + 1}`} value={r.ref} onChange={(v) => set(r.id, { ref: v })} /></td>
               <td className="px-1 py-1"><NumCell label={`Received ${i + 1}`} value={r.received} onChange={(v) => set(r.id, { received: v ?? 0 })} /></td>
               <td className="px-1 py-1"><NumCell label={`Outstanding ${i + 1}`} value={r.outstanding} onChange={(v) => set(r.id, { outstanding: v ?? 0 })} /></td>
-              <td className="px-1 py-1"><SelectCell label={`Status ${i + 1}`} value={r.status} options={PAY_STATUSES} onChange={(v) => set(r.id, { status: v as CashInRow['status'] })} /></td>
+              <td className="px-1 py-1"><SelectCell label={`Status ${i + 1}`} value={r.status} options={PAY_STATUSES} onChange={(v) => set(r.id, cashInStatusPatch(r, v as CashInRow['status']))} /></td>
               <td className="px-1 py-1"><TextCell className="min-w-[220px]" label={`Remarks ${i + 1}`} value={r.remarks} onChange={(v) => set(r.id, { remarks: v })} /></td>
               <td className="px-1 py-1"><DeleteCell label={`Remove cash in ${i + 1}`} onDelete={() => removeRow(p, 'cashIn', r.id)} /></td>
             </tr>
@@ -185,17 +185,17 @@ function CashOut({ project: p, rows, settings: s }: { project: Project; rows: Ca
   const add = () =>
     patchCash(p, 'cashOut', (r) => [
       ...r,
-      { id: newRowId(), date: todayIso(), payee: '', category: s.cashCategories[0] ?? 'Material', description: '', amount: 0, method: s.payMethods[0] ?? '', remarks: '' },
+      { id: newRowId(), date: todayIso(), payee: '', category: s.cashCategories[0] ?? 'Material', description: '', amount: 0, status: 'Paid', method: s.payMethods[0] ?? '', remarks: '' },
     ]);
   return (
-    <Section title="Cash out" sub="Payments actually made for this job." onAdd={add} addLabel="Add cash out">
+    <Section title="Cash out" sub="Payments for this job. Only rows marked Paid count as cash out; Not Paid rows show as payable." onAdd={add} addLabel="Add cash out">
       <datalist id="pay-methods">
         {s.payMethods.map((m) => (
           <option key={m} value={m} />
         ))}
       </datalist>
       <table className="w-full text-sm">
-        <Head cols={['Date paid', 'Payee', 'Category', 'Description', 'Amount', 'Method', 'Remarks', '']} right={[4]} />
+        <Head cols={['Date paid / due', 'Payee', 'Category', 'Description', 'Amount', 'Status', 'Method', 'Remarks', '']} right={[4]} />
         <tbody className="divide-y divide-slate-100">
           {rows.map((r, i) => (
             <tr key={r.id}>
@@ -204,19 +204,20 @@ function CashOut({ project: p, rows, settings: s }: { project: Project; rows: Ca
               <td className="px-1 py-1"><SelectCell label={`Category ${i + 1}`} value={r.category} options={s.cashCategories} onChange={(v) => set(r.id, { category: v })} /></td>
               <td className="px-1 py-1"><TextCell className="min-w-[200px]" label={`Description ${i + 1}`} value={r.description} onChange={(v) => set(r.id, { description: v })} /></td>
               <td className="px-1 py-1"><NumCell label={`Amount ${i + 1}`} value={r.amount} onChange={(v) => set(r.id, { amount: v ?? 0 })} /></td>
+              <td className="px-1 py-1"><SelectCell label={`Status ${i + 1}`} value={cashOutStatus(r)} options={PAY_STATUSES} onChange={(v) => set(r.id, { status: v as CashInRow['status'] })} /></td>
               <td className="px-1 py-1"><TextCell label={`Method ${i + 1}`} list="pay-methods" value={r.method} onChange={(v) => set(r.id, { method: v })} /></td>
               <td className="px-1 py-1"><TextCell className="min-w-[180px]" label={`Remarks ${i + 1}`} value={r.remarks} onChange={(v) => set(r.id, { remarks: v })} /></td>
               <td className="px-1 py-1"><DeleteCell label={`Remove cash out ${i + 1}`} onDelete={() => removeRow(p, 'cashOut', r.id)} /></td>
             </tr>
           ))}
-          {!rows.length && <Empty cols={8} text="No cash out yet." />}
+          {!rows.length && <Empty cols={9} text="No cash out yet." />}
         </tbody>
         {rows.length > 0 && (
           <tfoot className="bg-slate-50 font-semibold">
             <tr>
               <td className="px-2 py-2" colSpan={4}>Total</td>
               <td className="px-2 py-2 text-right tabular-nums">{rm(rows.reduce((a, r) => a + r.amount, 0))}</td>
-              <td colSpan={3} />
+              <td colSpan={4} />
             </tr>
           </tfoot>
         )}

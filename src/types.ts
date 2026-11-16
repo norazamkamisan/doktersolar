@@ -281,14 +281,17 @@ export interface CashInRow {
   remarks: string;
 }
 
-/** Money actually paid out. */
+/** Money paid out, or due to be paid out. Only Paid rows count as cash out. */
 export interface CashOutRow {
   id: string;
+  /** paid or due, yyyy-mm-dd or '' */
   date: string;
   payee: string;
   category: string;
   description: string;
   amount: number;
+  /** missing on rows saved before statuses existed: see cashOutStatus() */
+  status?: PayStatus;
   method: string;
   remarks: string;
 }
