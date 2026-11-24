@@ -47,6 +47,9 @@ jobs:
           node -e "import('./api/data.js').then(m => { if (typeof m.GET !== 'function' || typeof m.POST !== 'function') process.exit(1) })"
           node -e "import('./api/login.js').then(m => { if (typeof m.POST !== 'function') process.exit(1) })"
           node -e "import('./api/users.js').then(m => { if (typeof m.GET !== 'function' || typeof m.POST !== 'function' || typeof m.DELETE !== 'function') process.exit(1) })"
+          node -e "import('./api/photos.js').then(m => { if (typeof m.GET !== 'function' || typeof m.POST !== 'function' || typeof m.DELETE !== 'function') process.exit(1) })"
+          node -e "import('./api/google-connect.js').then(m => { if (typeof m.GET !== 'function') process.exit(1) })"
+          node -e "import('./api/google-callback.js').then(m => { if (typeof m.GET !== 'function') process.exit(1) })"
           node -e "import('./middleware.js').then(m => { if (typeof m.default !== 'function') process.exit(1) })"
           node -e "import('./netlify/functions/pvwatts.mjs').then(m => { if (typeof m.default !== 'function') process.exit(1) })"
 

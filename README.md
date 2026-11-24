@@ -47,7 +47,7 @@ A solar design and proposal studio: sketch a roof on satellite imagery, auto-fil
 | **Energy & savings** | `kWp × peak sun hours × 365 × 0.8`, or NREL PVWatts if configured. Monthly production chart, tariff, price per watt, degradation (first year, then per year), tariff escalation, payback and 25-year cumulative savings |
 | **Proposal** (`/proposals/:id`) | A4 pages in the style of a company proposal: cover letter, about us, recommended system with map and equipment, system performance and environmental benefits, how solar works, monthly bill savings table, net financial impact, quotation with deposit and payment milestones, quote acceptance, case studies and terms. Company content (cover photo, about us, case studies, terms, payment details, panel/inverter brands, warranties) is set once under **Settings → Proposal**; inverter model and size, price and discount per project on the **Proposal** tab. **Download PDF** makes one PDF page per proposal page; **Share link** puts the proposal data in the URL so it opens on any device |
 | **Leads / Designs / Proposals** | Focused list views |
-| **Site visit checklist** | **Design → Site visit**: the PSP Group preliminary site visit checklist (participants, grid connection, roof, electrical, data system, HSE, special requirements, remarks) with tick buttons, text boxes and 21 photo slots that open the phone camera. Project, salesperson and date are filled in; picking the site's TNB fuse / CT rating shows the solar limit (rating × 60%) against the designed kWp. Answers save with the project; photos stay on the device that took them. **Print / Save PDF** lays it out as the A4 form, with the site visit details guide |
+| **Site visit checklist** | **Design → Site visit**: the PSP Group preliminary site visit checklist (participants, grid connection, roof, electrical, data system, HSE, special requirements, remarks) with tick buttons, text boxes and 21 photo slots that open the phone camera. Project, salesperson and date are filled in; picking the site's TNB fuse / CT rating shows the solar limit (rating × 60%) against the designed kWp. Answers save with the project; photos are kept on the device and, once [photos are connected to Google Drive](#site-visit-photos-in-google-drive), uploaded to the owner's Drive and shown on every device. **Print / Save PDF** lays it out as the A4 form, with the site visit details guide |
 | **Sales team & logins** | Add salespeople (name, phone, email) under **Settings → Company → Sales team**; the admin picks one per project (new project form or the **Info** tab), and their details appear as "Prepared by" on the proposal. Give a salesperson a **login ID and password** there and they sign in with it, see and edit **only their own projects**, and their new projects are theirs automatically. See [Sign-in and salesperson logins](#password-protection) |
 | **Install as an app** | The site is an installable web app: **Install app** in the menu (Chrome, Edge, Android) or Safari → Share → **Add to Home Screen** (iPhone, iPad). It then opens from its own icon in its own window. Data is the same as on the website (Google Drive) |
 | **Settings** | Company name, contact, logo upload (stored as base64), default panel wattage and size, price per watt, tariff, peak sun hours, degradation and currency. **Equipment & warranties** (panel product and performance warranty, inverter and its warranty) appear in every proposal's system details. You can also reset to the demo data |
@@ -66,6 +66,9 @@ doktersolar/
 ├─ middleware.js                # sign-in gate: checks the session cookie (Vercel Routing Middleware)
 ├─ api/login.js                 # sign in: admin (SITE_PASSWORD) or a salesperson's login
 ├─ api/users.js                 # salesperson logins (admin only)
+├─ api/photos.js                # site visit photos in the owner's Google Drive
+├─ api/google-connect.js        # connect Google Drive for photos (admin)
+├─ api/google-callback.js       # Google's consent screen returns here
 ├─ server/session.mjs           # signed sessions, password hashing (PBKDF2)
 ├─ server/access.mjs            # who sees and changes what
 ├─ tests/                       # npm test: middleware + data merge rules
@@ -193,6 +196,17 @@ The key is only read on the server (`server/pvwatts-core.mjs`, via `process.env.
 ```bash
 vercel --prod
 ```
+
+### Site visit photos in Google Drive
+
+The robot account that edits the data file can't own files in a personal Google Drive (it has no storage of its own), so photos are uploaded **as the owner**, with a one-time Google sign-in:
+
+1. **Google Cloud → APIs & Services → OAuth consent screen** (Google Auth Platform): app name *DokterSolar*, your email, audience *External*. Under **Data access**, add the scope `.../auth/drive.file`. Under **Audience**, click **Publish app** so it's *In production* (in *Testing*, Google ends the connection after 7 days).
+2. **Credentials → Create credentials → OAuth client ID**: type *Web application*, authorised redirect URI `https://<your-site>/api/google-callback`. Copy the client ID and secret.
+3. **Vercel → Environment Variables**: add `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET` (Production), then redeploy.
+4. **Settings → Photos in Google Drive → Connect** and sign in with the Google account that owns the data file.
+
+Photos then go to a **DokterSolar photos** folder (one subfolder per project). With the `drive.file` scope the app only sees files it created. The connection (a refresh token) is kept in the data file and never sent to the app; salespeople can only add or see photos of their own projects (`api/photos.js`, tested in `tests/photos.test.mjs` against a fake Google). Deleting a photo moves it to the Drive bin.
 
 ### Password protection
 

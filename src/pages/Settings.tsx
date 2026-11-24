@@ -7,6 +7,7 @@ import { Field, NumberField, PageHeader } from '../components/ui';
 import { BrandLogo } from '../components/Logo';
 import OpenSolarImportCard from '../components/OpenSolarImportCard';
 import ProposalSettings from '../components/ProposalSettings';
+import PhotosDriveSettings from '../components/PhotosDriveSettings';
 import CostingSettings from '../components/CostingSettings';
 import SalesTeamSettings from '../components/Salespeople';
 
@@ -179,6 +180,8 @@ function AdminSettings() {
         </section>
 
         <ProposalSettings s={s} />
+
+        <PhotosDriveSettings />
 
         <CostingSettings />
 

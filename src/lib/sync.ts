@@ -34,6 +34,13 @@ interface ServerData {
   settings?: Settings | null;
   projects?: Project[];
   deleted?: Record<string, string>;
+  /** whether site visit photos go to Google Drive (and to whose account, for the admin) */
+  photos?: PhotosCloud;
+}
+
+export interface PhotosCloud {
+  connected: boolean;
+  email: string;
 }
 
 interface Host {
@@ -127,6 +134,18 @@ export function useMe(): Me {
 }
 export const currentMe = () => me;
 
+let photosCloud: PhotosCloud = { connected: false, email: '' };
+/** Whether site visit photos are saved to Google Drive (Settings → Photos in Google Drive). */
+export function usePhotosCloud(): PhotosCloud {
+  return useSyncExternalStore(
+    (l) => {
+      listeners.add(l);
+      return () => listeners.delete(l);
+    },
+    () => photosCloud,
+  );
+}
+
 export function useSyncStatus(): SyncStatus {
   return useSyncExternalStore(
     (l) => {
@@ -208,6 +227,7 @@ export async function pull(force = false): Promise<void> {
     if (data.me) {
       const changedUser = data.me.role !== me.role || data.me.salespersonId !== me.salespersonId;
       me = data.me;
+      if (data.photos && (data.photos.connected !== photosCloud.connected || data.photos.email !== photosCloud.email)) photosCloud = data.photos;
       const key = me.role === 'admin' ? 'admin' : `sales:${me.salespersonId}`;
       if (owner !== key) {
         if (owner || me.role === 'sales') {
