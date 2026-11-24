@@ -106,6 +106,14 @@
   .leaflet-control-container {
     display: none;
   }
+  /* site visit checklist: one section per printed page */
+  .sv-page {
+    max-width: none !important;
+    break-after: page;
+  }
+  .sv-page:last-child {
+    break-after: auto;
+  }
   /* Zero Capex deck: one 16:9 slide per landscape page, unscaled */
   @page slide {
     size: 338.67mm 190.5mm;

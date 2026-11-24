@@ -1,3 +1,4 @@
+import type { SiteVisit } from './lib/siteVisit';
 import type { TnbBill } from './lib/tnbBill';
 
 export type ProjectStatus = 'Lead' | 'Designing' | 'Proposal Sent' | 'Won' | 'Installed';
@@ -106,6 +107,8 @@ export interface Project {
   costing?: ProjectCosting;
   /** payments to make and money in/out for this job (Cashflow tab) */
   cashflow?: ProjectCashflow;
+  /** preliminary site visit checklist answers (Design tab → Site visit; photos stay on the device) */
+  siteVisit?: SiteVisit;
 }
 
 export interface ProjectBill extends TnbBill {
