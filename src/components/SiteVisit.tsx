@@ -4,19 +4,44 @@ import { Camera, CheckCircle2, CloudUpload, ExternalLink, HardDrive, Printer, Tr
 import { usePhotosCloud } from '../lib/sync';
 import type { Project, Settings } from '../types';
 import { updateProject } from '../lib/store';
-import { CHECKLIST, LV_LIMITS, progress, type Field, type SiteVisit, type SiteVisitValue } from '../lib/siteVisit';
+import { CHECKLIST_TITLE, LV_LIMITS, checklistFor, progress, type ChecklistKind, type Field, type SiteVisit, type SiteVisitValue } from '../lib/siteVisit';
+import { tariffModelOf } from '../lib/solar';
 import { deletePhoto, savePhoto, usePhotos } from '../lib/photoStore';
 import { preparedBy } from '../lib/proposal';
 import { num } from '../lib/format';
 import guideImage from '../assets/site-visit-guide.png';
 
+/**
+ * Which checklist a project uses, unless changed by hand: residential for homes (a residential TNB
+ * bill, or a TNB Domestic tariff), the commercial / industrial one otherwise.
+ */
+export function defaultChecklistKind(p: Project): ChecklistKind {
+  if (p.bill) return p.bill.category === 'residential' ? 'residential' : 'ci';
+  const t = tariffModelOf(p);
+  return t === 'tnb' || t === 'tnb-tou' ? 'residential' : 'ci';
+}
+export const checklistKindOf = (p: Project): ChecklistKind => p.siteVisit?.kind ?? defaultChecklistKind(p);
+
 /** Answers prefilled from the project until someone types over them. */
 export function siteVisitDefaults(p: Project, s: Settings): Record<string, string> {
+  const rep = preparedBy(p, s).name;
+  // the day the checklist was last filled in, until someone types the survey date
+  const day = p.siteVisit?.updatedAt ? new Date(p.siteVisit.updatedAt).toLocaleDateString('en-GB') : '';
+  const kwh = p.monthlyKwh ? `${num(p.monthlyKwh)} kWh/month` : '';
+  const bill = p.monthlyBill > 0 ? `RM ${num(p.monthlyBill)}/month` : '';
   return {
+    // commercial / industrial
     site: [p.customerName, p.address].filter(Boolean).join(', '),
-    conductedBy: preparedBy(p, s).name,
-    // the day the checklist was last filled in, until someone types the survey date
-    date: p.siteVisit?.updatedAt ? new Date(p.siteVisit.updatedAt).toLocaleDateString('en-GB') : '',
+    conductedBy: rep,
+    date: day,
+    // residential
+    rContact: [p.customerName, p.phone].filter(Boolean).join(' / '),
+    rAddress: p.address,
+    rVisit: [day, rep].filter(Boolean).join(' / '),
+    rAccount: p.bill?.accountNo ?? '',
+    rUsage: [kwh, bill].filter(Boolean).join(' / '),
+    rSize: p.systemKw > 0 ? `${num(p.systemKw, 2)} kWp` : '',
+    rSurveyor: [rep, day].filter(Boolean).join(' / '),
   };
 }
 
@@ -135,11 +160,13 @@ function PhotoSlot({ projectId, slot, label, url }: { projectId: string; slot: s
   );
 }
 
-/** Design tab → Site visit: the PSP Group preliminary site visit checklist for this project. */
+/** Design tab → Site visit: the PSP Group site visit checklist for this project (residential or C&I). */
 export default function SiteVisitChecklist({ project: p, settings: s }: { project: Project; settings: Settings }) {
   const { urls, error, waiting, cloudError } = usePhotos(p.id);
   const cloud = usePhotosCloud();
-  const { done, total } = progress(p.siteVisit);
+  const kind = checklistKindOf(p);
+  const auto = defaultChecklistKind(p);
+  const { done, total } = progress(p.siteVisit, kind);
   const lv = lvCheck(p);
   const voltage = valueOf(p, s, 'voltage');
   const isMvHv = Array.isArray(voltage) && voltage.some((v) => !v.startsWith('LV'));
@@ -148,7 +175,7 @@ export default function SiteVisitChecklist({ project: p, settings: s }: { projec
     <div className="space-y-4">
       <div className="card flex flex-wrap items-center justify-between gap-3 p-4">
         <div>
-          <h2 className="font-semibold text-slate-900">Preliminary site visit checklist</h2>
+          <h2 className="font-semibold text-slate-900">{CHECKLIST_TITLE[kind]}</h2>
           <p className="text-sm text-slate-500">
             {done} of {total} items filled in
             {p.siteVisit?.updatedAt && ` · updated ${new Date(p.siteVisit.updatedAt).toLocaleDateString('en-GB')}`}. Answers save with the project.
@@ -170,12 +197,40 @@ export default function SiteVisitChecklist({ project: p, settings: s }: { projec
         </Link>
       </div>
 
-      <details className="card p-4">
-        <summary className="cursor-pointer text-sm font-medium text-slate-700">Site visit details guide (what to measure)</summary>
-        <img src={guideImage} alt="Site visit details guide: roof dimensions, roof profile, obstructions and equipment locations" className="mx-auto mt-3 w-full max-w-2xl" />
-      </details>
+      <div className="card flex flex-wrap items-center gap-x-4 gap-y-2 p-4">
+        <span className="text-sm font-medium text-slate-700">Checklist</span>
+        <div className="inline-flex rounded-lg bg-slate-100 p-1" role="radiogroup" aria-label="Checklist type">
+          {(
+            [
+              ['residential', 'Residential'],
+              ['ci', 'Commercial / industrial'],
+            ] as const
+          ).map(([k, label]) => (
+            <button
+              key={k}
+              type="button"
+              role="radio"
+              aria-checked={kind === k}
+              onClick={() => update(p, () => ({ kind: k === auto ? undefined : k }))}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${kind === k ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <span className="text-xs text-slate-500">
+          {p.siteVisit?.kind ? 'Chosen by hand.' : `Picked from the project's ${p.bill ? 'TNB bill' : 'tariff'}.`} Answers on each checklist are kept separately.
+        </span>
+      </div>
 
-      {CHECKLIST.map((sec) => (
+      {kind === 'ci' && (
+        <details className="card p-4">
+          <summary className="cursor-pointer text-sm font-medium text-slate-700">Site visit details guide (what to measure)</summary>
+          <img src={guideImage} alt="Site visit details guide: roof dimensions, roof profile, obstructions and equipment locations" className="mx-auto mt-3 w-full max-w-2xl" />
+        </details>
+      )}
+
+      {checklistFor(kind).map((sec) => (
         <section key={sec.id} className="card space-y-4 p-4 sm:p-5">
           <div>
             <h3 className="font-semibold text-slate-900">{sec.title}</h3>
@@ -262,7 +317,7 @@ export default function SiteVisitChecklist({ project: p, settings: s }: { projec
             <div className="space-y-4">
               <div>
                 <label className="label" htmlFor="sv-remarks">
-                  Remarks and sketch notes
+                  {kind === 'residential' ? 'Remarks and outstanding items' : 'Remarks and sketch notes'}
                 </label>
                 <textarea
                   id="sv-remarks"

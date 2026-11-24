@@ -2,7 +2,7 @@ import { FormEvent, useMemo, useState } from 'react';
 import { Check, Loader2, MousePointerClick, Move, PenLine, Plus, RotateCcw, Search, Trash2, Undo2, X, type LucideIcon } from 'lucide-react';
 import type { LatLng, Project, RoofFace } from '../../types';
 import { updateDesign, updateProject, useSettings } from '../../lib/store';
-import SiteVisitChecklist from '../../components/SiteVisit';
+import SiteVisitChecklist, { checklistKindOf } from '../../components/SiteVisit';
 import { progress } from '../../lib/siteVisit';
 import { geocode } from '../../lib/api';
 import { compass, facesPatch, layoutPanels, recommendedKw, systemKw } from '../../lib/solar';
@@ -76,7 +76,7 @@ export default function DesignTab({ project: p }: { project: Project }) {
     setView(v);
     window.history.replaceState(window.history.state, '', v === 'site' ? '#site-visit' : window.location.pathname + window.location.search);
   };
-  const { done, total } = progress(p.siteVisit);
+  const { done, total } = progress(p.siteVisit, checklistKindOf(p));
   return (
     <div className="space-y-4">
       <div className="inline-flex rounded-lg bg-slate-100 p-1" role="tablist" aria-label="Design view">
