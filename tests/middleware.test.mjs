@@ -23,6 +23,12 @@ test('public paths pass through without a session', async () => {
   }
 });
 
+test('the privacy policy is public', async () => {
+  const res = await get('/privacy');
+  assert.equal(res.status, 200);
+  assert.match(await res.text(), /drive.file/);
+});
+
 test('the proposals list is not public, only single proposals are', () => {
   assert.equal(isPublicPath('/proposals'), false);
   assert.equal(isPublicPath('/proposals/'), false);

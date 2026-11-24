@@ -13,6 +13,7 @@
 //   /assets/*, /favicon.svg, /_vercel/*   static files and Vercel analytics
 //   /manifest.webmanifest, /icons/*        app install details and icons (phones fetch them without the cookie)
 //   /api/login                             the sign-in form posts here (api/login.js)
+//   /privacy                               privacy policy (served here, linked from Google's consent screen)
 //
 // Not run by `npm run dev` / `vite preview`; local development stays open.
 
@@ -43,6 +44,8 @@ export default async function middleware(request) {
   const url = new URL(request.url);
   const path = url.pathname;
 
+  // the privacy policy is public (Google's sign-in consent screen links to it)
+  if (path === '/privacy' || path === '/privacy/') return privacyPage();
   if (isPublicPath(path)) return next();
 
   const password = process.env.SITE_PASSWORD;
@@ -176,6 +179,25 @@ function loginPage({ next: dest, error }) {
          <button type="submit">Sign in</button>
        </form>
        <p class="foot">Shared proposal links open without a password.</p>`,
+    ),
+  );
+}
+
+function privacyPage() {
+  return html(
+    200,
+    page(
+      'Privacy policy',
+      `<h1>Privacy policy</h1>
+       <p class="muted">DokterSolar is a private workspace for a solar installer's own team. It is not a public service.</p>
+       <h2 style="font-size:15px;margin:18px 0 6px">What it stores</h2>
+       <p class="muted">Customer projects, proposals and site visit checklists entered by the team, kept in the company's own Google Drive. Site visit photos are uploaded to a "DokterSolar photos" folder in the company's Google Drive.</p>
+       <h2 style="font-size:15px;margin:18px 0 6px">Google account access</h2>
+       <p class="muted">When the company connects its Google Drive for photos, DokterSolar asks only for the <code>drive.file</code> permission: it can create and manage the files it makes itself, and cannot see any other files in that Drive. The connection can be removed at any time in Settings, or from the Google account's security settings.</p>
+       <h2 style="font-size:15px;margin:18px 0 6px">Sharing</h2>
+       <p class="muted">Data is not sold or shared with anyone. A customer sees only the proposal link they are sent.</p>
+       <h2 style="font-size:15px;margin:18px 0 6px">Contact</h2>
+       <p class="muted">Questions: contact the company that sent you the proposal.</p>`,
     ),
   );
 }
