@@ -1,9 +1,9 @@
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, Printer } from 'lucide-react';
 import { useProject, useSettings } from '../lib/store';
-import { CHECKLIST, LV_LIMITS, type ChecklistSection } from '../lib/siteVisit';
+import { CHECKLIST, LV_LIMITS, RESIDENTIAL_CHECKLIST, type ChecklistSection } from '../lib/siteVisit';
 import { usePhotos } from '../lib/photoStore';
-import { lvCheck, valueOf } from '../components/SiteVisit';
+import { checklistKindOf, lvCheck, valueOf } from '../components/SiteVisit';
 import { num } from '../lib/format';
 import { Empty } from '../components/ui';
 import type { Project, Settings } from '../types';
@@ -11,7 +11,7 @@ import guideImage from '../assets/site-visit-guide.png';
 
 const cell = 'border border-slate-700 px-2 py-1.5 align-middle';
 
-function Page({ s, children }: { s: Settings; children: React.ReactNode }) {
+function Page({ s, children, residential = false }: { s: Settings; children: React.ReactNode; residential?: boolean }) {
   return (
     <section className="sv-page mx-auto mb-4 bg-white p-[12mm] text-[12px] leading-snug text-slate-900 shadow-sm print:mb-0 print:p-0 print:shadow-none" style={{ maxWidth: '210mm' }}>
       <header className="mb-3 flex items-center justify-between gap-3 border-b-2 border-[#135466] pb-2 font-bold text-[#135466]">
@@ -19,10 +19,12 @@ function Page({ s, children }: { s: Settings; children: React.ReactNode }) {
           {s.logo && <img src={s.logo} alt="" className="h-8 max-w-[120px] object-contain" />}
           {s.companyName}
         </span>
-        <span>PRELIMINARY SITE VISIT CHECKLIST</span>
+        <span>{residential ? 'RESIDENTIAL SOLAR SITE VISIT' : 'PRELIMINARY SITE VISIT CHECKLIST'}</span>
       </header>
       {children}
-      <footer className="mt-4 border-t border-slate-400 pt-1.5 text-[10px] text-slate-500">{s.companyName} • Preliminary survey for feasibility review</footer>
+      <footer className="mt-4 border-t border-slate-400 pt-1.5 text-[10px] text-slate-500">
+        {s.companyName} • {residential ? 'Residential solar site visit: preliminary field observations for design review' : 'Preliminary survey for feasibility review'}
+      </footer>
     </section>
   );
 }
@@ -106,19 +108,57 @@ export default function SiteVisitReport() {
     );
   }
 
+  const toolbar = (
+    <div className="no-print mx-auto mb-4 flex max-w-[210mm] flex-wrap items-center justify-between gap-2 px-4">
+      <Link to={`/projects/${p.id}/design#site-visit`} className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900">
+        <ArrowLeft className="h-4 w-4" /> Back to project
+      </Link>
+      <button type="button" className="btn-primary" onClick={() => window.print()}>
+        <Printer className="h-4 w-4" /> Print / Save as PDF
+      </button>
+    </div>
+  );
+
+  // Residential: one page per section of the residential checklist
+  if (checklistKindOf(p) === 'residential') {
+    return (
+      <div className="min-h-full bg-slate-200 py-4 print:bg-white print:py-0">
+        {toolbar}
+        {RESIDENTIAL_CHECKLIST.map((sec, i) => (
+          <Page key={sec.id} s={s} residential>
+            {i === 0 && (
+              <>
+                <h1 className="mb-1 text-[22px] font-bold">Residential Solar Site Visit Checklist</h1>
+                <p className="mb-3 text-slate-600">
+                  {p.customerName}
+                  {p.address ? ` · ${p.address}` : ''}
+                  {p.systemKw > 0 ? ` · designed ${num(p.systemKw, 2)} kWp` : ''}
+                </p>
+              </>
+            )}
+            {i > 0 && <p className="mb-2 text-[11px] text-slate-500">Site reference: {p.customerName}{p.address ? `, ${p.address}` : ''}</p>}
+            <h2 className="mb-1 text-[15px] font-bold">{sec.title}</h2>
+            <Answers sec={sec} p={p} s={s} />
+            <Photos sec={sec} urls={urls} />
+            {sec.remarks && (
+              <>
+                <h3 className="mb-1 mt-3 text-[13px] font-bold">Remarks and outstanding items</h3>
+                <div className="min-h-[100px] whitespace-pre-line border border-slate-500 p-2 text-[#074a98]">{p.siteVisit?.remarks ?? ''}</div>
+                <p className="mt-2 text-[10px] text-slate-500">Preliminary field observations for design review.</p>
+              </>
+            )}
+          </Page>
+        ))}
+      </div>
+    );
+  }
+
   const lv = lvCheck(p);
   const byId = Object.fromEntries(CHECKLIST.map((c) => [c.id, c]));
 
   return (
     <div className="min-h-full bg-slate-200 py-4 print:bg-white print:py-0">
-      <div className="no-print mx-auto mb-4 flex max-w-[210mm] flex-wrap items-center justify-between gap-2 px-4">
-        <Link to={`/projects/${p.id}/design`} className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900">
-          <ArrowLeft className="h-4 w-4" /> Back to project
-        </Link>
-        <button type="button" className="btn-primary" onClick={() => window.print()}>
-          <Printer className="h-4 w-4" /> Print / Save as PDF
-        </button>
-      </div>
+      {toolbar}
 
       <Page s={s}>
         <h1 className="mb-1 text-[22px] font-bold">Site Visit Checklist</h1>
