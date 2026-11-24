@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Camera, CheckCircle2, ExternalLink, Printer, Trash2, TriangleAlert } from 'lucide-react';
+import { Camera, CheckCircle2, CloudUpload, ExternalLink, HardDrive, Printer, Trash2, TriangleAlert } from 'lucide-react';
+import { usePhotosCloud } from '../lib/sync';
 import type { Project, Settings } from '../types';
 import { updateProject } from '../lib/store';
 import { CHECKLIST, LV_LIMITS, progress, type Field, type SiteVisit, type SiteVisitValue } from '../lib/siteVisit';
@@ -97,7 +98,7 @@ function PhotoSlot({ projectId, slot, label, url }: { projectId: string; slot: s
     if (!file) return;
     setBusy(true);
     try {
-      await savePhoto(projectId, slot, file);
+      await savePhoto(projectId, slot, file, label);
     } catch (err) {
       alert((err as Error).message);
     }
@@ -136,7 +137,8 @@ function PhotoSlot({ projectId, slot, label, url }: { projectId: string; slot: s
 
 /** Design tab → Site visit: the PSP Group preliminary site visit checklist for this project. */
 export default function SiteVisitChecklist({ project: p, settings: s }: { project: Project; settings: Settings }) {
-  const { urls, error } = usePhotos(p.id);
+  const { urls, error, waiting, cloudError } = usePhotos(p.id);
+  const cloud = usePhotosCloud();
   const { done, total } = progress(p.siteVisit);
   const lv = lvCheck(p);
   const voltage = valueOf(p, s, 'voltage');
@@ -149,8 +151,17 @@ export default function SiteVisitChecklist({ project: p, settings: s }: { projec
           <h2 className="font-semibold text-slate-900">Preliminary site visit checklist</h2>
           <p className="text-sm text-slate-500">
             {done} of {total} items filled in
-            {p.siteVisit?.updatedAt && ` · updated ${new Date(p.siteVisit.updatedAt).toLocaleDateString('en-GB')}`}. Answers save with the project; photos stay on this
-            device.
+            {p.siteVisit?.updatedAt && ` · updated ${new Date(p.siteVisit.updatedAt).toLocaleDateString('en-GB')}`}. Answers save with the project.
+          </p>
+          <p className={`mt-1 flex items-center gap-1.5 text-xs ${cloudError ? 'text-red-600' : cloud.connected ? 'text-emerald-700' : 'text-slate-500'}`}>
+            {cloud.connected ? <CloudUpload className="h-3.5 w-3.5" /> : <HardDrive className="h-3.5 w-3.5" />}
+            {cloudError
+              ? `Photos couldn't reach Google Drive: ${cloudError}`
+              : cloud.connected
+                ? waiting
+                  ? `${waiting} photo${waiting === 1 ? '' : 's'} waiting to upload to Google Drive…`
+                  : 'Photos are saved to Google Drive.'
+                : 'Photos stay on this device. The admin can connect Google Drive for photos in Settings.'}
           </p>
         </div>
         <Link to={`/site-visit/${p.id}`} className="btn-primary">

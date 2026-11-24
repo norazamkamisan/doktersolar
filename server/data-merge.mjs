@@ -2,7 +2,8 @@
 //
 // File shape:
 //   { format: 'doktersolar.v1', savedAt, settings, projects: Project[], deleted: { [id]: deletedAtIso },
-//     users: salesperson logins (see server/access.mjs; never sent to the app) }
+//     users: salesperson logins (see server/access.mjs; never sent to the app),
+//     google: the photo-upload connection { refreshToken, email, connectedAt } (server/google-photos.mjs; never sent) }
 //
 // Each project carries `updatedAt`; the newer copy wins. Deleted projects leave a tombstone so a
 // device that was offline can't bring them back with an older copy.
@@ -31,6 +32,7 @@ export function parseData(text) {
     projects: Array.isArray(raw.projects) ? raw.projects : [],
     deleted: raw.deleted && typeof raw.deleted === 'object' ? raw.deleted : {},
     users: Array.isArray(raw.users) ? raw.users : [],
+    ...(raw.google && typeof raw.google === 'object' ? { google: raw.google } : {}),
   };
 }
 
@@ -70,5 +72,6 @@ export function applyChanges(data, { upsert = [], remove = [], settings } = {}, 
     projects: [...byId.values()].sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt))),
     deleted: trimmed,
     users: data.users ?? [],
+    ...(data.google ? { google: data.google } : {}),
   };
 }

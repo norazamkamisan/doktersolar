@@ -4,13 +4,20 @@
 // - sales (own login): only projects whose salespersonId is theirs; can't change settings, can't
 //   take over or delete someone else's project. Login records (password hashes) never leave the server.
 
-/** The data a user is sent: never the login records; salespeople only get their own projects. */
+/**
+ * The data a user is sent: never the login records or the Google connection (only whether photos
+ * go to Google Drive); salespeople only get their own projects.
+ */
 export function visibleData(data, me) {
   // eslint-disable-next-line no-unused-vars
-  const { users, ...rest } = data;
-  if (me.role === 'admin') return rest;
-  return { ...rest, projects: rest.projects.filter((p) => p && p.salespersonId === me.userId) };
+  const { users, google, ...rest } = data;
+  const photos = { connected: !!google?.refreshToken, email: me.role === 'admin' ? google?.email ?? '' : '' };
+  if (me.role === 'admin') return { ...rest, photos };
+  return { ...rest, photos, projects: rest.projects.filter((p) => p && p.salespersonId === me.userId) };
 }
+
+/** Whether this user may see (and add photos to) a project. */
+export const canSeeProject = (project, me) => !!project && (me.role === 'admin' || project.salespersonId === me.userId);
 
 /**
  * Keep only the changes this user may make. Returns the allowed changes and the ids refused
