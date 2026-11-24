@@ -10,12 +10,15 @@ import ProposalView from './pages/ProposalView';
 import SettingsPage from './pages/Settings';
 import CashflowPage from './pages/Cashflow';
 import PriceListPage from './pages/PriceList';
+import SiteVisitReport from './pages/SiteVisitReport';
 
 export default function App() {
   return (
     <Routes>
       {/* Customer-facing proposal: no app chrome */}
       <Route path="/proposals/:id" element={<ProposalView />} />
+      {/* printable site visit checklist (behind the login, unlike shared proposals) */}
+      <Route path="/site-visit/:id" element={<SiteVisitReport />} />
       <Route element={<Layout />}>
         <Route path="/" element={<Navigate to="/home" replace />} />
         <Route path="/home" element={<Home />} />

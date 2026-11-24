@@ -1,7 +1,9 @@
 import { FormEvent, useMemo, useState } from 'react';
 import { Check, Loader2, MousePointerClick, Move, PenLine, Plus, RotateCcw, Search, Trash2, Undo2, X, type LucideIcon } from 'lucide-react';
 import type { LatLng, Project, RoofFace } from '../../types';
-import { updateDesign, updateProject } from '../../lib/store';
+import { updateDesign, updateProject, useSettings } from '../../lib/store';
+import SiteVisitChecklist from '../../components/SiteVisit';
+import { progress } from '../../lib/siteVisit';
 import { geocode } from '../../lib/api';
 import { compass, facesPatch, layoutPanels, recommendedKw, systemKw } from '../../lib/solar';
 import { num } from '../../lib/format';
@@ -66,7 +68,42 @@ function ToolButton({
   );
 }
 
+/** Design tab: the roof layout, or the site visit checklist. */
 export default function DesignTab({ project: p }: { project: Project }) {
+  const settings = useSettings();
+  const [view, setView] = useState<'roof' | 'site'>(() => (window.location.hash === '#site-visit' ? 'site' : 'roof'));
+  const show = (v: 'roof' | 'site') => {
+    setView(v);
+    window.history.replaceState(window.history.state, '', v === 'site' ? '#site-visit' : window.location.pathname + window.location.search);
+  };
+  const { done, total } = progress(p.siteVisit);
+  return (
+    <div className="space-y-4">
+      <div className="inline-flex rounded-lg bg-slate-100 p-1" role="tablist" aria-label="Design view">
+        {(
+          [
+            ['roof', 'Roof design'],
+            ['site', `Site visit (${done}/${total})`],
+          ] as const
+        ).map(([k, label]) => (
+          <button
+            key={k}
+            type="button"
+            role="tab"
+            aria-selected={view === k}
+            onClick={() => show(k)}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${view === k ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {view === 'roof' ? <RoofDesign project={p} /> : <SiteVisitChecklist project={p} settings={settings} />}
+    </div>
+  );
+}
+
+function RoofDesign({ project: p }: { project: Project }) {
   const d = p.design;
   /** null = not drawing; -1 = drawing a new roof; n = redrawing roof n */
   const [drawTarget, setDrawTarget] = useState<number | null>(null);
